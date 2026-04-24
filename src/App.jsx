@@ -74,6 +74,8 @@ export default function App() {
   const [extraForm, setExtraForm] = useState(null);
   const [cavaModal, setCavaModal] = useState(null);
   const [importMsg, setImportMsg] = useState("");
+  const [notaBusca, setNotaBusca] = useState("");
+  const [retNotaBusca, setRetNotaBusca] = useState("");
 
   // Init notas if empty
   useEffect(() => {
@@ -497,6 +499,12 @@ export default function App() {
         const mC = {}; rM.forEach(r => { const m = r.motivo || "?"; mC[m] = (mC[m] || 0) + (Number(r.qtd) || 1); });
         const mS = Object.entries(mC).sort((a, b) => b[1] - a[1]); const mMax = mS.length > 0 ? mS[0][1] : 1;
         const eR = EQUIPES.map(eq => ({ ...eq, total: rM.filter(r => r.eqId === eq.id).reduce((s, r) => s + (Number(r.qtd) || 1), 0) })).sort((a, b) => b.total - a.total);
+        const eRChart = eR.filter(e => e.total > 0);
+
+        // Daily chart
+        const [cy, cm] = histMonth.split("-").map(Number); const dInM = new Date(cy, cm, 0).getDate();
+        const dailyData = []; for (let d = 1; d <= dInM; d++) { const ds = histMonth + "-" + String(d).padStart(2, "0"); dailyData.push({ dia: d, qtd: rM.filter(r => r.data === ds).reduce((s, r) => s + (Number(r.qtd) || 1), 0) }); }
+
         return (
           <div style={{ padding: "12px 14px 100px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
@@ -508,10 +516,45 @@ export default function App() {
               <div style={{ flex: 1, background: "#111d33", borderRadius: 10, padding: "10px 12px", border: "1px solid #1e2d48", borderLeft: "3px solid #ef4444" }}><div style={{ fontSize: 9, color: "#4b6080", fontWeight: 700, textTransform: "uppercase" }}>Total</div><div className="m" style={{ fontSize: 22, fontWeight: 800, color: "#ef4444" }}>{totalM}</div></div>
               <div style={{ flex: 1, background: "#111d33", borderRadius: 10, padding: "10px 12px", border: "1px solid #1e2d48", borderLeft: "3px solid #f97316" }}><div style={{ fontSize: 9, color: "#4b6080", fontWeight: 700, textTransform: "uppercase" }}>Equipes</div><div className="m" style={{ fontSize: 22, fontWeight: 800, color: "#f97316" }}>{new Set(rM.map(r => r.eqId)).size}</div></div>
             </div>
+
+            {/* Gráfico diário */}
+            {totalM > 0 && (
+              <div style={{ background: "#111d33", borderRadius: 14, padding: "12px 6px 6px", border: "1px solid #1e2d48", marginBottom: 14 }}>
+                <div style={{ fontSize: 9, color: "#4b6080", fontWeight: 700, textTransform: "uppercase", paddingLeft: 8, marginBottom: 6 }}>Retrabalhos por Dia</div>
+                <ResponsiveContainer width="100%" height={150}>
+                  <BarChart data={dailyData} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#1e2d48" vertical={false} />
+                    <XAxis dataKey="dia" tick={{ fill: "#4b6080", fontSize: 8 }} axisLine={{ stroke: "#1e2d48" }} tickLine={false} />
+                    <YAxis tick={{ fill: "#4b6080", fontSize: 8 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                    <Tooltip content={({ active, payload, label }) => active && payload?.length ? <div style={{ background: "#1a2540", border: "1px solid #2d3d56", borderRadius: 8, padding: "6px 10px" }}><div style={{ fontSize: 11, color: "#94a3b8" }}>Dia {label}</div><div style={{ fontSize: 12, color: "#ef4444", fontWeight: 700 }}>{payload[0].value} retrabalho(s)</div></div> : null} />
+                    <Bar dataKey="qtd" radius={[3, 3, 0, 0]} barSize={8}>{dailyData.map((d, i) => <Cell key={i} fill={d.qtd > 0 ? "#ef4444" : "#1e2d48"} />)}</Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+
+            {/* Gráfico por equipe */}
+            {eRChart.length > 0 && (
+              <div style={{ background: "#111d33", borderRadius: 14, padding: "12px 6px 6px", border: "1px solid #1e2d48", marginBottom: 14 }}>
+                <div style={{ fontSize: 9, color: "#4b6080", fontWeight: 700, textTransform: "uppercase", paddingLeft: 8, marginBottom: 6 }}>Retrabalhos por Equipe</div>
+                <ResponsiveContainer width="100%" height={Math.max(120, eRChart.length * 28)}>
+                  <BarChart data={eRChart} layout="vertical" margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#1e2d48" horizontal={false} />
+                    <XAxis type="number" tick={{ fill: "#4b6080", fontSize: 8 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                    <YAxis type="category" dataKey="enc" tick={{ fill: "#d4dce9", fontSize: 10 }} width={70} axisLine={false} tickLine={false} />
+                    <Tooltip content={({ active, payload }) => active && payload?.length ? <div style={{ background: "#1a2540", border: "1px solid #2d3d56", borderRadius: 8, padding: "6px 10px" }}><div style={{ fontSize: 11, color: "#f1f5f9", fontWeight: 700 }}>{payload[0]?.payload?.nome} - {payload[0]?.payload?.enc}</div><div style={{ fontSize: 12, color: "#ef4444", fontWeight: 700 }}>{payload[0]?.value} retrabalho(s)</div></div> : null} />
+                    <Bar dataKey="total" radius={[0, 4, 4, 0]} barSize={14} fill="#ef4444">
+                      {eRChart.map((e, i) => <Cell key={i} fill={i === 0 ? "#ef4444" : i === 1 ? "#f97316" : "#fb923c"} />)}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+
             {mS.length > 0 && (<div style={{ marginBottom: 14 }}><div style={{ fontSize: 10, color: "#4b6080", fontWeight: 700, textTransform: "uppercase", marginBottom: 6 }}>Motivos</div>{mS.map(([m, c]) => (<div key={m} style={{ background: "#111d33", borderRadius: 6, padding: "6px 10px", marginBottom: 3, border: "1px solid #1e2d48" }}><div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}><span style={{ fontSize: 11, color: "#e2e8f0" }}>{m}</span><span className="m" style={{ fontSize: 11, fontWeight: 800, color: "#ef4444" }}>{c}</span></div><div style={{ height: 3, background: "rgba(255,255,255,.05)", borderRadius: 3 }}><div style={{ height: "100%", width: (c / mMax * 100) + "%", background: "#ef4444", borderRadius: 3 }} /></div></div>))}</div>)}
-            <div style={{ fontSize: 10, color: "#4b6080", fontWeight: 700, textTransform: "uppercase", marginBottom: 6 }}>Por Equipe</div>
+            <div style={{ fontSize: 10, color: "#4b6080", fontWeight: 700, textTransform: "uppercase", marginBottom: 6 }}>Ranking por Equipe</div>
             {eR.map((eq, i) => (<div key={eq.id} style={{ background: "#111d33", borderRadius: 8, padding: "8px 10px", marginBottom: 3, border: "1px solid #1e2d48", display: "flex", alignItems: "center", gap: 8, opacity: eq.total === 0 ? .3 : 1 }}>
-              <div style={{ fontSize: 10, fontWeight: 800, color: eq.total > 0 ? "#ef4444" : "#4b6080", width: 16 }}>{i + 1}</div>
+              <div style={{ width: 22, height: 22, borderRadius: 11, background: eq.total > 0 && i < 3 ? ["#ef4444", "#f97316", "#fb923c"][i] + "22" : "#1e2d48", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: eq.total > 0 && i < 3 ? ["#ef4444", "#f97316", "#fb923c"][i] : "#4b6080" }}>{i + 1}</div>
               <div style={{ flex: 1, fontSize: 11, fontWeight: 700, color: "#e2e8f0" }}>{eq.nome} - {eq.enc}</div>
               <div className="m" style={{ fontSize: 14, fontWeight: 800, color: eq.total > 0 ? "#ef4444" : "#2d3d56" }}>{eq.total}</div>
             </div>))}
@@ -527,7 +570,25 @@ export default function App() {
             <h2 style={{ fontSize: 15, fontWeight: 800, color: "#f1f5f9", marginBottom: 14 }}>Registrar Retrabalho</h2>
             <FL label="Equipe"><select value={retForm.eqId} onChange={e => setRetForm(f => ({ ...f, eqId: e.target.value }))} style={inp}><option value="">Selecione</option>{EQUIPES.map(eq => <option key={eq.id} value={eq.id}>{eq.nome} - {eq.enc}</option>)}</select></FL>
             <FL label="Data"><input type="date" value={retForm.data} onChange={e => setRetForm(f => ({ ...f, data: e.target.value }))} style={inp} /></FL>
-            <FL label="Nota"><select value={retForm.notaId} onChange={e => setRetForm(f => ({ ...f, notaId: e.target.value, pontoNome: "" }))} style={inp}><option value="">Selecione</option>{notas.map(n => <option key={n.id} value={n.id}>{n.nome}</option>)}</select></FL>
+            <FL label="Nota / Obra">
+              <input value={retNotaBusca} onChange={e => { setRetNotaBusca(e.target.value); setRetForm(f => ({ ...f, notaId: "", pontoNome: "" })); }} placeholder="🔍 Pesquisar nota..." style={inp} />
+              {retNotaBusca.length > 0 && !retForm.notaId && (
+                <div style={{ maxHeight: 180, overflowY: "auto", marginTop: 4, display: "flex", flexDirection: "column", gap: 2 }}>
+                  {notas.filter(n => n.nome.toLowerCase().includes(retNotaBusca.toLowerCase())).map(n => (
+                    <button key={n.id} onClick={() => { setRetForm(f => ({ ...f, notaId: n.id, pontoNome: "" })); setRetNotaBusca(n.nome); }} style={{ padding: "8px 10px", background: "#111d33", border: "1px solid #1e2d48", borderRadius: 8, cursor: "pointer", textAlign: "left", fontSize: 11, color: "#d4dce9" }}>{n.nome}</button>
+                  ))}
+                  {notas.filter(n => n.nome.toLowerCase().includes(retNotaBusca.toLowerCase())).length === 0 && (
+                    <div style={{ padding: 10, fontSize: 11, color: "#4b6080", textAlign: "center" }}>Nenhuma nota encontrada</div>
+                  )}
+                </div>
+              )}
+              {retForm.notaId && (
+                <div style={{ marginTop: 4, padding: "6px 10px", background: "rgba(96,165,250,.08)", borderRadius: 6, border: "1px solid rgba(96,165,250,.15)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: 11, color: "#60a5fa", fontWeight: 600 }}>{notas.find(n => n.id === retForm.notaId)?.nome}</span>
+                  <button onClick={() => { setRetForm(f => ({ ...f, notaId: "", pontoNome: "" })); setRetNotaBusca(""); }} style={{ background: "none", border: "none", color: "#4b6080", cursor: "pointer", fontSize: 12 }}>✕</button>
+                </div>
+              )}
+            </FL>
             {retNota && (<FL label="Ponto"><select value={retForm.pontoNome} onChange={e => setRetForm(f => ({ ...f, pontoNome: e.target.value }))} style={inp}><option value="">Selecione</option>{(retNota.pontos || []).map(p => <option key={p.id} value={p.n}>{p.n}</option>)}</select></FL>)}
             <FL label="Quantidade"><input type="number" min="1" value={retForm.qtd} onChange={e => setRetForm(f => ({ ...f, qtd: parseInt(e.target.value) || 1 }))} style={inp} /></FL>
             <FL label="Motivo"><div style={{ display: "flex", flexDirection: "column", gap: 3 }}>{MOTIVOS_RETRAB.map(m => (<button key={m} onClick={() => setRetForm(f => ({ ...f, motivo: m }))} style={{ padding: "9px 12px", background: retForm.motivo === m ? "rgba(239,68,68,.1)" : "#111d33", border: retForm.motivo === m ? "1.5px solid rgba(239,68,68,.3)" : "1px solid #1e2d48", borderRadius: 8, cursor: "pointer", textAlign: "left", fontSize: 12, fontWeight: retForm.motivo === m ? 700 : 500, color: retForm.motivo === m ? "#ef4444" : "#94a3b8" }}>{m}</button>))}</div></FL>
@@ -557,7 +618,28 @@ export default function App() {
           <button onClick={() => { setAtribForm(null); setScreen("home"); }} style={bk}>← Voltar</button>
           <h2 style={{ fontSize: 15, fontWeight: 800, color: "#f1f5f9", marginBottom: 14 }}>Atribuir Pontos</h2>
           <FL label="Equipe"><select value={atribForm.eqId} onChange={e => setAtribForm(f => ({ ...f, eqId: e.target.value }))} style={inp}><option value="">Selecione</option>{EQUIPES.map(eq => <option key={eq.id} value={eq.id}>{eqLabel(eq)} ({eq.tipo})</option>)}</select></FL>
-          <FL label="Nota"><select value={atribForm.notaId} onChange={e => setAtribForm(f => ({ ...f, notaId: e.target.value, pIds: [] }))} style={inp}><option value="">Selecione</option>{notas.map(n => <option key={n.id} value={n.id}>{n.nome} ({(n.pontos || []).length} pts · {fUS(n.u)} US)</option>)}</select></FL>
+          <FL label="Nota / Obra">
+            <input value={notaBusca} onChange={e => { setNotaBusca(e.target.value); setAtribForm(f => ({ ...f, notaId: "", pIds: [] })); }} placeholder="🔍 Pesquisar nota..." style={inp} />
+            {notaBusca.length > 0 && !atribForm.notaId && (
+              <div style={{ maxHeight: 200, overflowY: "auto", marginTop: 4, display: "flex", flexDirection: "column", gap: 2 }}>
+                {notas.filter(n => n.nome.toLowerCase().includes(notaBusca.toLowerCase())).map(n => (
+                  <button key={n.id} onClick={() => { setAtribForm(f => ({ ...f, notaId: n.id, pIds: [] })); setNotaBusca(n.nome); }} style={{ padding: "8px 10px", background: "#111d33", border: "1px solid #1e2d48", borderRadius: 8, cursor: "pointer", textAlign: "left", fontSize: 11, color: "#d4dce9", display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ flex: 1 }}>{n.nome}</span>
+                    <span className="m" style={{ fontSize: 10, color: "#eab308", marginLeft: 8 }}>{(n.pontos || []).length} pts · {fUS(n.u)} US</span>
+                  </button>
+                ))}
+                {notas.filter(n => n.nome.toLowerCase().includes(notaBusca.toLowerCase())).length === 0 && (
+                  <div style={{ padding: 10, fontSize: 11, color: "#4b6080", textAlign: "center" }}>Nenhuma nota encontrada</div>
+                )}
+              </div>
+            )}
+            {atribForm.notaId && (
+              <div style={{ marginTop: 4, padding: "6px 10px", background: "rgba(96,165,250,.08)", borderRadius: 6, border: "1px solid rgba(96,165,250,.15)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: 11, color: "#60a5fa", fontWeight: 600 }}>{notas.find(n => n.id === atribForm.notaId)?.nome}</span>
+                <button onClick={() => { setAtribForm(f => ({ ...f, notaId: "", pIds: [] })); setNotaBusca(""); }} style={{ background: "none", border: "none", color: "#4b6080", cursor: "pointer", fontSize: 12 }}>✕</button>
+              </div>
+            )}
+          </FL>
           {notaSel && (<FL label={"Pontos (" + ptsDispo.length + ")"}>
             {ptsDispo.length === 0 ? <div style={{ fontSize: 11, color: "#f97316", padding: 10 }}>Todos atribuídos</div> : (<>
               <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
