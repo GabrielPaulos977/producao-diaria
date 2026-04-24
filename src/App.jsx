@@ -3,15 +3,15 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGri
 import { db, ref, set, onValue, push, remove } from "./firebase";
 import { EQUIPES, INIT_NOTAS, DIAS_UTEIS, DIVISOR_US, MOTIVOS_RETRAB, SERVICOS_LISTA } from "./data";
 import * as XLSX from "xlsx";
-
+  
 const today = new Date().toISOString().split("T")[0];
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 
 const BRL = v => (v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const fUS = v => (v || 0).toFixed(2);
 const pct = (a, b) => (b > 0 ? Math.round((a / b) * 100) : 0);
-const pctCol = p => (p >= 100 ? "#22c55e" : p >= 70 ? "#84cc16" : p >= 40 ? "#eab308" : p > 0 ? "#f97316" : "#475569");
-const tipoCor = t => (t === "B3" ? "#60a5fa" : t === "C1" ? "#a78bfa" : t === "B1" ? "#f59e0b" : "#475569");
+const pctCol = p => (p >= 100 ? "#34d399" : p >= 70 ? "#a3e635" : p >= 40 ? "#facc15" : p > 0 ? "#fb923c" : "#475569");
+const tipoCor = t => (t === "B3" ? "#3b9eff" : t === "C1" ? "#a78bfa" : t === "B1" ? "#fbbf24" : "#475569");
 const eqLabel = eq => eq.nome + " - " + eq.enc;
 
 function Ring({ value, max, size = 80, stroke = 7 }) {
@@ -249,6 +249,40 @@ export default function App() {
   const ptsDispo = notaSel ? (notaSel.pontos || []).filter(p => !pontosUsados.has(notaSel.id + ":" + p.id)) : [];
   const sI = s => s === "ok" ? "✅" : s === "no" ? "❌" : "⏳";
 
+  // Monthly totals for speedometer
+  const mesAtribs = atribs.filter(a => a.data?.startsWith(histMonth));
+  const mesTotalRealUS = useMemo(() => {
+    let t = 0;
+    EQUIPES.forEach(eq => { t += getEqMonthUS(eq.id, histMonth); });
+    return Math.round(t * 100) / 100;
+  }, [histMonth, getEqMonthUS]);
+  const mesMetaTotal = EQUIPES.reduce((s, eq) => s + eq.meta * DIAS_UTEIS, 0);
+  const mesDiasComDados = new Set(mesAtribs.map(a => a.data)).size;
+
+  // Gauge component
+  const Gauge = ({ value, max, label, sublabel }) => {
+    const p = pct(value, max);
+    const angle = Math.min(p, 100) * 1.8; // 0-180 degrees
+    const col = pctCol(p);
+    return (
+      <div style={{ textAlign: "center" }}>
+        <div style={{ position: "relative", width: 160, height: 90, margin: "0 auto" }}>
+          <svg width="160" height="90" viewBox="0 0 160 90">
+            <path d="M 15 85 A 65 65 0 0 1 145 85" fill="none" stroke="rgba(255,255,255,.06)" strokeWidth="12" strokeLinecap="round" />
+            <path d="M 15 85 A 65 65 0 0 1 145 85" fill="none" stroke={col} strokeWidth="12" strokeLinecap="round"
+              strokeDasharray={`${angle / 180 * 204} 204`} style={{ transition: "stroke-dasharray .8s ease" }} />
+          </svg>
+          <div style={{ position: "absolute", bottom: 2, left: 0, right: 0, textAlign: "center" }}>
+            <div className="m" style={{ fontSize: 26, fontWeight: 900, color: col }}>{p}%</div>
+          </div>
+        </div>
+        <div className="m" style={{ fontSize: 14, fontWeight: 800, color: "#f1f5f9", marginTop: 4 }}>{fUS(value)} US</div>
+        <div style={{ fontSize: 10, color: "#4b6080" }}>{label}</div>
+        {sublabel && <div style={{ fontSize: 9, color: "#3a5070" }}>{sublabel}</div>}
+      </div>
+    );
+  };
+
   // ═══ LOGIN SCREEN ═══
   if (!role) {
     return (
@@ -327,39 +361,50 @@ export default function App() {
       {/* ═══ HOME ═══ */}
       {!notasLoading && screen === "home" && (
         <div style={{ padding: "12px 14px 100px" }}>
+
+          {/* Speedometer - Meta Mensal */}
+          <div style={{ background: "linear-gradient(135deg,#0d1829,#132035)", borderRadius: 16, padding: "18px 14px", marginBottom: 12, border: "1px solid #1a2d4d" }}>
+            <Gauge value={mesTotalRealUS} max={mesMetaTotal} label={`Meta mensal: ${fUS(mesMetaTotal)} US`} sublabel={`${mesDiasComDados} dia(s) lançado(s) de ${DIAS_UTEIS}`} />
+          </div>
+
+          {/* Resumo do dia */}
           {doDia.length > 0 && (
-            <div style={{ background: "linear-gradient(135deg,#111d33,#162240)", borderRadius: 14, padding: 14, marginBottom: 12, border: "1px solid #1e2d48" }}>
+            <div style={{ background: "linear-gradient(135deg,#0d1829,#162240)", borderRadius: 14, padding: 14, marginBottom: 12, border: "1px solid #1a2d4d" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <Ring value={totRealUS} max={totPrevUS} size={70} stroke={6} />
                 <div style={{ flex: 1 }}>
-                  <div><span style={{ fontSize: 9, color: "#4b6080", fontWeight: 700 }}>PREV </span><span className="m" style={{ fontSize: 14, fontWeight: 800, color: "#60a5fa" }}>{BRL(totPrev)}</span><span className="m" style={{ fontSize: 10, color: "#4b6080", marginLeft: 4 }}>({fUS(totPrevUS)} US)</span></div>
-                  <div><span style={{ fontSize: 9, color: "#4b6080", fontWeight: 700 }}>REAL </span><span className="m" style={{ fontSize: 14, fontWeight: 800, color: "#22c55e" }}>{BRL(totReal)}</span><span className="m" style={{ fontSize: 10, color: "#4b6080", marginLeft: 4 }}>({fUS(totRealUS)} US)</span></div>
+                  <div><span style={{ fontSize: 9, color: "#5a7aa0", fontWeight: 700 }}>PREV </span><span className="m" style={{ fontSize: 14, fontWeight: 800, color: "#3b9eff" }}>{BRL(totPrev)}</span><span className="m" style={{ fontSize: 10, color: "#5a7aa0", marginLeft: 4 }}>({fUS(totPrevUS)} US)</span></div>
+                  <div><span style={{ fontSize: 9, color: "#5a7aa0", fontWeight: 700 }}>REAL </span><span className="m" style={{ fontSize: 14, fontWeight: 800, color: "#34d399" }}>{BRL(totReal)}</span><span className="m" style={{ fontSize: 10, color: "#5a7aa0", marginLeft: 4 }}>({fUS(totRealUS)} US)</span></div>
                 </div>
               </div>
             </div>
           )}
 
-          {!isGestor && <button onClick={() => { setAtribForm({ eqId: "", notaId: "", pIds: [] }); setScreen("atribuir"); }} style={{ width: "100%", padding: "11px 0", background: "linear-gradient(135deg,#eab308,#d97706)", color: "#0b1121", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 800, cursor: "pointer", marginBottom: 12 }}>+ Atribuir Pontos</button>}
+          {!isGestor && <button onClick={() => { setAtribForm({ eqId: "", notaId: "", pIds: [] }); setScreen("atribuir"); }} style={{ width: "100%", padding: "12px 0", background: "linear-gradient(135deg,#f5c518,#e6a817)", color: "#0b1121", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 800, cursor: "pointer", marginBottom: 12, boxShadow: "0 4px 16px rgba(245,197,24,.2)" }}>+ Atribuir Pontos</button>}
 
-          <div style={{ fontSize: 10, fontWeight: 700, color: "#4b6080", textTransform: "uppercase", letterSpacing: .8, marginBottom: 6 }}>Equipes — {Object.keys(eqMap).length}/{EQUIPES.length}</div>
+          <div style={{ fontSize: 10, fontWeight: 700, color: "#5a7aa0", textTransform: "uppercase", letterSpacing: .8, marginBottom: 6 }}>Equipes — {Object.keys(eqMap).length}/{EQUIPES.length}</div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {EQUIPES.map(eq => {
               const ea = eqMap[eq.id] || [];
-              if (!ea.length) return (<div key={eq.id} style={{ background: "#111827", borderRadius: 10, padding: "10px 12px", border: "1px dashed #1e2d48", opacity: .35, display: "flex", justifyContent: "space-between", alignItems: "center" }}><div><span style={{ fontSize: 11, fontWeight: 700, color: "#4b6080" }}>{eqLabel(eq)}</span><span style={{ fontSize: 9, color: tipoCor(eq.tipo), marginLeft: 6, fontWeight: 700 }}>{eq.tipo}</span></div><span style={{ fontSize: 10, color: "#2d3d56" }}>—</span></div>);
+              if (!ea.length) return (<div key={eq.id} style={{ background: "#0d1829", borderRadius: 10, padding: "10px 12px", border: "1px dashed #1a2d4d", opacity: .35, display: "flex", justifyContent: "space-between", alignItems: "center" }}><div><span style={{ fontSize: 11, fontWeight: 700, color: "#5a7aa0" }}>{eqLabel(eq)}</span><span style={{ fontSize: 9, color: tipoCor(eq.tipo), marginLeft: 6, fontWeight: 700 }}>{eq.tipo}</span></div><span style={{ fontSize: 10, color: "#2d3d56" }}>—</span></div>);
               const t = getTotals(ea); const pc = pct(t.realUS, eq.meta);
               let okC = 0, totP = 0; ea.forEach(a => { const pts = getPts(a.notaId, a.pIds); totP += pts.length; pts.forEach(p => { if ((a.status || {})[p.id] === "ok") okC++; }); });
               const extC = ea.reduce((s, a) => (a.extras || []).length + s, 0);
+              // Média diária
+              const eqMesUS = getEqMonthUS(eq.id, histMonth);
+              const mediaDia = mesDiasComDados > 0 ? (eqMesUS / mesDiasComDados) : 0;
               return (
-                <div key={eq.id} onClick={() => { setSelEq(ea); setScreen("detalhe"); }} style={{ background: "#111d33", borderRadius: 12, border: "1px solid " + pctCol(pc) + "18", padding: "10px 12px", cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}>
+                <div key={eq.id} onClick={() => { setSelEq(ea); setScreen("detalhe"); }} style={{ background: "#0d1829", borderRadius: 12, border: "1.5px solid " + pctCol(pc) + "30", padding: "10px 12px", cursor: "pointer", display: "flex", alignItems: "center", gap: 10, transition: "border-color .2s" }}>
                   <Ring value={t.realUS} max={eq.meta || t.prevUS} size={46} stroke={4} />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 12, fontWeight: 800, color: "#f1f5f9" }}>{eqLabel(eq)} <span style={{ fontSize: 9, color: tipoCor(eq.tipo), fontWeight: 700 }}>{eq.tipo}</span></div>
-                    <div style={{ fontSize: 10, color: "#4b6080" }}>✅ {okC}/{totP}{extC > 0 ? " · +" + extC + " extra" : ""}</div>
+                    <div style={{ fontSize: 12, fontWeight: 800, color: "#f1f5f9" }}>{eqLabel(eq)} <span style={{ fontSize: 9, color: tipoCor(eq.tipo), fontWeight: 700, background: tipoCor(eq.tipo) + "18", padding: "1px 5px", borderRadius: 4 }}>{eq.tipo}</span></div>
+                    <div style={{ fontSize: 10, color: "#5a7aa0" }}>✅ {okC}/{totP}{extC > 0 ? " · +" + extC + " extra" : ""}</div>
+                    <div style={{ fontSize: 9, color: "#3a5070" }}>Média mês: {fUS(mediaDia)} US/dia</div>
                   </div>
                   <div style={{ textAlign: "right", flexShrink: 0 }}>
-                    <div className="m" style={{ fontSize: 13, fontWeight: 800, color: "#22c55e" }}>{fUS(t.realUS)} US</div>
-                    <div className="m" style={{ fontSize: 9, color: "#4b6080" }}>meta: {eq.meta} US</div>
+                    <div className="m" style={{ fontSize: 14, fontWeight: 800, color: "#34d399" }}>{fUS(t.realUS)} US</div>
+                    <div className="m" style={{ fontSize: 9, color: "#5a7aa0" }}>meta: {eq.meta} US</div>
                   </div>
                 </div>
               );
@@ -461,6 +506,7 @@ export default function App() {
               <div style={{ display: "flex", gap: 10, fontSize: 9, color: "#4b6080", marginTop: 2 }}>
                 <span>Dia: <strong style={{ color: pctCol(eq.pctDia) }}>{fUS(eq.diaUS)}/{eq.meta}</strong></span>
                 <span>Mês: <strong style={{ color: pctCol(eq.pctMes) }}>{fUS(eq.mesUS)}/{eq.metaMes}</strong></span>
+                <span>Média: <strong style={{ color: "#a78bfa" }}>{fUS(mesDiasComDados > 0 ? getEqMonthUS(eq.id, histMonth) / mesDiasComDados : 0)}/dia</strong></span>
               </div>
               {eq.meta > 0 && <div style={{ marginTop: 3, height: 4, background: "rgba(255,255,255,.05)", borderRadius: 4 }}><div style={{ height: "100%", width: Math.min(eq.pctMes, 100) + "%", background: pctCol(eq.pctMes), borderRadius: 4 }} /></div>}
             </div>
