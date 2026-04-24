@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, AreaChart, Area, ComposedChart, Line, PieChart, Pie, ReferenceLine } from "recharts";
 import { db, ref, set, onValue, push, remove } from "./firebase";
 import { EQUIPES, INIT_NOTAS, DIAS_UTEIS, DIVISOR_US, MOTIVOS_RETRAB, SERVICOS_LISTA } from "./data";
 import * as XLSX from "xlsx";
-  
+
 const today = new Date().toISOString().split("T")[0];
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 
@@ -487,15 +487,24 @@ export default function App() {
             <input type="date" value={dataSel} onChange={e => setDataSel(e.target.value)} style={{ flex: 1, ...inp }} />
           </div>
           <div style={{ background: "#111d33", borderRadius: 14, padding: "12px 6px 6px", border: "1px solid #1e2d48", marginBottom: 14 }}>
-            <div style={{ fontSize: 9, color: "#4b6080", fontWeight: 700, textTransform: "uppercase", paddingLeft: 8, marginBottom: 6 }}>Meta Mensal ({DIAS_UTEIS} dias) — US</div>
-            <ResponsiveContainer width="100%" height={Math.max(220, ranking.filter(e => e.meta > 0).length * 28)}>
-              <BarChart data={ranking.filter(e => e.meta > 0)} layout="vertical" margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e2d48" horizontal={false} />
-                <XAxis type="number" tick={{ fill: "#4b6080", fontSize: 8 }} axisLine={false} tickLine={false} />
-                <YAxis type="category" dataKey="enc" tick={{ fill: "#d4dce9", fontSize: 10 }} width={70} axisLine={false} tickLine={false} />
-                <Tooltip content={({ active, payload }) => active && payload?.length ? <div style={{ background: "#1a2540", border: "1px solid #2d3d56", borderRadius: 8, padding: "6px 10px" }}><div style={{ fontSize: 11, color: "#f1f5f9", fontWeight: 700 }}>{payload[0]?.payload?.nome} - {payload[0]?.payload?.enc}</div><div style={{ fontSize: 11, color: "#22c55e" }}>Real: {fUS(payload[0]?.value)} US</div><div style={{ fontSize: 11, color: "#eab308" }}>Meta: {payload[0]?.payload?.metaMes} US</div></div> : null} />
-                <Bar dataKey="mesUS" radius={[0, 4, 4, 0]} barSize={14}>{ranking.filter(e => e.meta > 0).map((e, i) => <Cell key={i} fill={pctCol(e.pctMes)} />)}</Bar>
-              </BarChart>
+            <div style={{ display: "flex", justifyContent: "space-between", padding: "0 8px", marginBottom: 8 }}>
+              <span style={{ fontSize: 9, color: "#5a7aa0", fontWeight: 700, textTransform: "uppercase" }}>Produção Mensal — US</span>
+              <div style={{ display: "flex", gap: 12 }}>
+                <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 9, color: "#94a3b8" }}><span style={{ width: 8, height: 8, borderRadius: 2, background: "#34d399" }}></span>Realizado</span>
+                <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 9, color: "#94a3b8" }}><span style={{ width: 10, height: 2, borderRadius: 1, background: "#3b9eff" }}></span>Meta</span>
+              </div>
+            </div>
+            <ResponsiveContainer width="100%" height={260}>
+              <ComposedChart data={ranking.filter(e => e.meta > 0)} margin={{ top: 5, right: 10, left: -10, bottom: 30 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1e2d48" vertical={false} />
+                <XAxis dataKey="enc" tick={{ fill: "#5a7aa0", fontSize: 9 }} axisLine={{ stroke: "#1e2d48" }} tickLine={false} angle={-35} textAnchor="end" height={50} />
+                <YAxis tick={{ fill: "#5a7aa0", fontSize: 8 }} axisLine={false} tickLine={false} />
+                <Tooltip content={({ active, payload }) => active && payload?.length ? <div style={{ background: "#1a2540", border: "1px solid #2d3d56", borderRadius: 8, padding: "8px 12px" }}><div style={{ fontSize: 12, color: "#f1f5f9", fontWeight: 700, marginBottom: 4 }}>{payload[0]?.payload?.nome} - {payload[0]?.payload?.enc}</div><div style={{ fontSize: 11, color: "#34d399" }}>Realizado: {fUS(payload[0]?.payload?.mesUS)} US</div><div style={{ fontSize: 11, color: "#3b9eff" }}>Meta: {payload[0]?.payload?.metaMes} US</div><div style={{ fontSize: 11, color: pctCol(payload[0]?.payload?.pctMes) }}>{payload[0]?.payload?.pctMes}%</div></div> : null} />
+                <Bar dataKey="mesUS" name="Realizado" radius={[4, 4, 0, 0]} barSize={18}>
+                  {ranking.filter(e => e.meta > 0).map((e, i) => <Cell key={i} fill={pctCol(e.pctMes)} />)}
+                </Bar>
+                <Line type="monotone" dataKey="metaMes" name="Meta" stroke="#3b9eff" strokeWidth={2.5} strokeDasharray="6 4" dot={false} />
+              </ComposedChart>
             </ResponsiveContainer>
           </div>
           <div style={{ fontSize: 10, color: "#4b6080", fontWeight: 700, textTransform: "uppercase", marginBottom: 6 }}>Detalhamento</div>
@@ -524,15 +533,25 @@ export default function App() {
             <select value={histEq} onChange={e => setHistEq(e.target.value)} style={{ flex: 1, ...inp }}><option value="all">Todas</option>{EQUIPES.map(eq => <option key={eq.id} value={eq.id}>{eq.nome} - {eq.enc}</option>)}</select>
           </div>
           <div style={{ background: "#111d33", borderRadius: 14, padding: "12px 6px 6px", border: "1px solid #1e2d48", marginBottom: 14 }}>
+            <div style={{ display: "flex", gap: 16, padding: "0 8px", marginBottom: 8 }}>
+              <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: "#94a3b8" }}><span style={{ width: 10, height: 10, borderRadius: 2, background: "rgba(52,211,153,.3)" }}></span>Realizado</span>
+              <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: "#94a3b8" }}><span style={{ width: 10, height: 3, borderRadius: 1, background: "#3b9eff", display: "inline-block" }}></span>Meta</span>
+            </div>
             <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={histData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+              <ComposedChart data={histData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="gradReal" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#34d399" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#34d399" stopOpacity={0.02} />
+                  </linearGradient>
+                </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1e2d48" vertical={false} />
-                <XAxis dataKey="dia" tick={{ fill: "#4b6080", fontSize: 8 }} axisLine={{ stroke: "#1e2d48" }} tickLine={false} />
-                <YAxis tick={{ fill: "#4b6080", fontSize: 8 }} axisLine={false} tickLine={false} />
-                <Tooltip content={({ active, payload, label }) => active && payload?.length ? <div style={{ background: "#1a2540", border: "1px solid #2d3d56", borderRadius: 8, padding: "6px 10px" }}><div style={{ fontSize: 11, color: "#94a3b8" }}>Dia {label}</div>{payload.map((p, i) => <div key={i} style={{ fontSize: 11, color: p.color, fontWeight: 600 }}>{p.name}: {fUS(p.value)} US</div>)}</div> : null} />
-                <Bar dataKey="prevUS" name="Previsto" fill="#60a5fa" opacity={.25} radius={[2, 2, 0, 0]} barSize={7} />
-                <Bar dataKey="realUS" name="Realizado" radius={[2, 2, 0, 0]} barSize={7}>{histData.map((d, i) => <Cell key={i} fill={d.realUS >= d.prevUS && d.prevUS > 0 ? "#22c55e" : d.realUS > 0 ? "#eab308" : "#1e2d48"} />)}</Bar>
-              </BarChart>
+                <XAxis dataKey="dia" tick={{ fill: "#5a7aa0", fontSize: 8 }} axisLine={{ stroke: "#1e2d48" }} tickLine={false} />
+                <YAxis tick={{ fill: "#5a7aa0", fontSize: 8 }} axisLine={false} tickLine={false} />
+                <Tooltip content={({ active, payload, label }) => active && payload?.length ? <div style={{ background: "#1a2540", border: "1px solid #2d3d56", borderRadius: 8, padding: "6px 10px" }}><div style={{ fontSize: 11, color: "#94a3b8" }}>Dia {label}</div>{payload.map((p, i) => <div key={i} style={{ fontSize: 11, color: p.stroke || p.fill || p.color, fontWeight: 600 }}>{p.name}: {fUS(p.value)} US</div>)}</div> : null} />
+                <Area type="monotone" dataKey="realUS" name="Realizado" stroke="#34d399" strokeWidth={2.5} fill="url(#gradReal)" dot={false} />
+                <Line type="monotone" dataKey="prevUS" name="Meta" stroke="#3b9eff" strokeWidth={1.5} strokeDasharray="6 4" dot={false} />
+              </ComposedChart>
             </ResponsiveContainer>
           </div>
         </div>
@@ -597,7 +616,34 @@ export default function App() {
               </div>
             )}
 
-            {mS.length > 0 && (<div style={{ marginBottom: 14 }}><div style={{ fontSize: 10, color: "#4b6080", fontWeight: 700, textTransform: "uppercase", marginBottom: 6 }}>Motivos</div>{mS.map(([m, c]) => (<div key={m} style={{ background: "#111d33", borderRadius: 6, padding: "6px 10px", marginBottom: 3, border: "1px solid #1e2d48" }}><div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}><span style={{ fontSize: 11, color: "#e2e8f0" }}>{m}</span><span className="m" style={{ fontSize: 11, fontWeight: 800, color: "#ef4444" }}>{c}</span></div><div style={{ height: 3, background: "rgba(255,255,255,.05)", borderRadius: 3 }}><div style={{ height: "100%", width: (c / mMax * 100) + "%", background: "#ef4444", borderRadius: 3 }} /></div></div>))}</div>)}
+            {mS.length > 0 && (() => {
+              const DONUT_COLORS = ["#ef4444","#f97316","#facc15","#a78bfa","#3b9eff","#34d399","#f472b6","#fb923c","#6ee7b7","#818cf8","#94a3b8","#fbbf24"];
+              const donutData = mS.map(([name, value]) => ({ name, value }));
+              return (
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 10, color: "#5a7aa0", fontWeight: 700, textTransform: "uppercase", marginBottom: 6 }}>Motivos de retrabalho</div>
+                  <div style={{ background: "#111d33", borderRadius: 14, padding: "12px 8px", border: "1px solid #1e2d48", marginBottom: 8 }}>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <PieChart>
+                        <Pie data={donutData} cx="50%" cy="50%" innerRadius={50} outerRadius={80} dataKey="value" stroke="none">
+                          {donutData.map((_, i) => <Cell key={i} fill={DONUT_COLORS[i % DONUT_COLORS.length]} />)}
+                        </Pie>
+                        <Tooltip content={({ active, payload }) => active && payload?.length ? <div style={{ background: "#1a2540", border: "1px solid #2d3d56", borderRadius: 8, padding: "6px 10px" }}><div style={{ fontSize: 11, color: "#f1f5f9", fontWeight: 600 }}>{payload[0]?.name}</div><div style={{ fontSize: 12, color: "#ef4444", fontWeight: 700 }}>{payload[0]?.value} ({Math.round(payload[0]?.value / totalM * 100)}%)</div></div> : null} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 12px", padding: "0 4px" }}>
+                      {donutData.map((d, i) => (
+                        <span key={d.name} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: "#94a3b8" }}>
+                          <span style={{ width: 8, height: 8, borderRadius: 2, background: DONUT_COLORS[i % DONUT_COLORS.length], flexShrink: 0 }}></span>
+                          {d.name} ({d.value})
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  {mS.map(([m, c]) => (<div key={m} style={{ background: "#111d33", borderRadius: 6, padding: "6px 10px", marginBottom: 3, border: "1px solid #1e2d48" }}><div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}><span style={{ fontSize: 11, color: "#e2e8f0" }}>{m}</span><span className="m" style={{ fontSize: 11, fontWeight: 800, color: "#ef4444" }}>{c}</span></div><div style={{ height: 3, background: "rgba(255,255,255,.05)", borderRadius: 3 }}><div style={{ height: "100%", width: (c / mMax * 100) + "%", background: "#ef4444", borderRadius: 3 }} /></div></div>))}
+                </div>
+              );
+            })()}
             <div style={{ fontSize: 10, color: "#4b6080", fontWeight: 700, textTransform: "uppercase", marginBottom: 6 }}>Ranking por Equipe</div>
             {eR.map((eq, i) => (<div key={eq.id} style={{ background: "#111d33", borderRadius: 8, padding: "8px 10px", marginBottom: 3, border: "1px solid #1e2d48", display: "flex", alignItems: "center", gap: 8, opacity: eq.total === 0 ? .3 : 1 }}>
               <div style={{ width: 22, height: 22, borderRadius: 11, background: eq.total > 0 && i < 3 ? ["#ef4444", "#f97316", "#fb923c"][i] + "22" : "#1e2d48", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: eq.total > 0 && i < 3 ? ["#ef4444", "#f97316", "#fb923c"][i] : "#4b6080" }}>{i + 1}</div>
