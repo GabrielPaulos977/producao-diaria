@@ -15,7 +15,7 @@ export const EQUIPES = [
   {id:"eq12",nome:"SRO 6252",enc:"Alexandre",tipo:"C1",meta:14},
   {id:"eq13",nome:"SRO 6254",enc:"Reserva",tipo:"C1",meta:14},
   {id:"eq14",nome:"SRO 7742",enc:"Reserva",tipo:"B1",meta:18},
-  {id:"eq15",nome:"SRO 7744",enc:"Polidril",tipo:"B1",meta:2300},
+  {id:"eq15",nome:"SRO 7744",enc:"Polidril",tipo:"B1",meta:104.55},
   {id:"eq16",nome:"SRO 7743",enc:"Gilberto",tipo:"B1",meta:18},
   {id:"eq17",nome:"SRO 7745",enc:"Reserva",tipo:"-",meta:0},
 ];
