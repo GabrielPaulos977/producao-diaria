@@ -644,12 +644,39 @@ export default function App() {
                 </div>
               );
             })()}
-            <div style={{ fontSize: 10, color: "#4b6080", fontWeight: 700, textTransform: "uppercase", marginBottom: 6 }}>Ranking por Equipe</div>
+            <div style={{ fontSize: 10, color: "#5a7aa0", fontWeight: 700, textTransform: "uppercase", marginBottom: 6 }}>Ranking por Equipe</div>
             {eR.map((eq, i) => (<div key={eq.id} style={{ background: "#111d33", borderRadius: 8, padding: "8px 10px", marginBottom: 3, border: "1px solid #1e2d48", display: "flex", alignItems: "center", gap: 8, opacity: eq.total === 0 ? .3 : 1 }}>
               <div style={{ width: 22, height: 22, borderRadius: 11, background: eq.total > 0 && i < 3 ? ["#ef4444", "#f97316", "#fb923c"][i] + "22" : "#1e2d48", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: eq.total > 0 && i < 3 ? ["#ef4444", "#f97316", "#fb923c"][i] : "#4b6080" }}>{i + 1}</div>
               <div style={{ flex: 1, fontSize: 11, fontWeight: 700, color: "#e2e8f0" }}>{eq.nome} - {eq.enc}</div>
               <div className="m" style={{ fontSize: 14, fontWeight: 800, color: eq.total > 0 ? "#ef4444" : "#2d3d56" }}>{eq.total}</div>
             </div>))}
+
+            {/* Lista de registros com botão de remover */}
+            {rM.length > 0 && (
+              <div style={{ marginTop: 14 }}>
+                <div style={{ fontSize: 10, color: "#5a7aa0", fontWeight: 700, textTransform: "uppercase", marginBottom: 6 }}>Registros do Mês ({rM.length})</div>
+                {rM.sort((a, b) => (b.data || "").localeCompare(a.data || "")).map(r => {
+                  const eq = EQUIPES.find(e => e.id === r.eqId);
+                  const nt = notas.find(n => n.id === r.notaId);
+                  const rKey = r._fbKey;
+                  return (
+                    <div key={rKey || r.id} style={{ background: "#111d33", borderRadius: 8, padding: "8px 10px", marginBottom: 3, border: "1px solid #1e2d48", display: "flex", alignItems: "center", gap: 6 }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: "#e2e8f0" }}>
+                          {eq?.nome} - {eq?.enc} <span style={{ color: "#5a7aa0", fontSize: 9 }}>· {(r.data || "").split("-").reverse().join("/")}</span>
+                        </div>
+                        <div style={{ fontSize: 10, color: "#f97316", fontWeight: 600 }}>{r.motivo}</div>
+                        {r.pontoNome && <div style={{ fontSize: 9, color: "#3b9eff" }}>Ponto: {r.pontoNome}</div>}
+                        {nt && <div style={{ fontSize: 9, color: "#5a7aa0" }}>Nota: {nt.nome}</div>}
+                        {r.obs && <div style={{ fontSize: 9, color: "#5a7aa0", fontStyle: "italic" }}>{r.obs}</div>}
+                      </div>
+                      <div className="m" style={{ fontSize: 13, fontWeight: 800, color: "#ef4444", flexShrink: 0 }}>{r.qtd}x</div>
+                      <button onClick={() => { if (rKey) fbRemove("retrab/" + rKey); }} style={{ background: "rgba(239,68,68,.1)", border: "1px solid rgba(239,68,68,.2)", borderRadius: 6, color: "#ef4444", cursor: "pointer", fontSize: 11, padding: "4px 8px", fontWeight: 700 }}>✕</button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         );
       })()}
