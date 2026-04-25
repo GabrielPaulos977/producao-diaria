@@ -728,6 +728,29 @@ export default function App() {
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}><span style={{ fontSize: 11, color: "#94a3b8" }}>Pontos</span><span className="m" style={{ fontSize: 12, fontWeight: 700, color: "#eab308" }}>{notas.reduce((s, n) => s + (n.pontos || []).length, 0)}</span></div>
             <div style={{ display: "flex", justifyContent: "space-between" }}><span style={{ fontSize: 11, color: "#94a3b8" }}>Total US</span><span className="m" style={{ fontSize: 12, fontWeight: 700, color: "#22c55e" }}>{fUS(notas.reduce((s, n) => s + n.u, 0))} US</span></div>
           </div>
+
+          {/* Lista de notas com opção de excluir */}
+          <div style={{ marginTop: 14 }}>
+            <div style={{ fontSize: 10, color: "#5a7aa0", fontWeight: 700, textTransform: "uppercase", marginBottom: 6 }}>Notas carregadas ({notas.length})</div>
+            <div style={{ maxHeight: 300, overflowY: "auto" }}>
+              {notas.map((n, idx) => (
+                <div key={n.id} style={{ background: "#111d33", borderRadius: 8, padding: "8px 10px", marginBottom: 3, border: "1px solid #1e2d48", display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: "#e2e8f0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{n.nome}</div>
+                    <div style={{ fontSize: 9, color: "#5a7aa0" }}>{(n.pontos || []).length} pts · {fUS(n.u)} US · {BRL(n.r)}</div>
+                  </div>
+                  <button onClick={() => {
+                    if (confirm("Excluir nota: " + n.nome + "?\nAs atribuições ligadas a ela também serão perdidas.")) {
+                      const updated = notas.filter((_, i) => i !== idx);
+                      fbSet("notas", updated.length > 0 ? updated : null);
+                    }
+                  }} style={{ background: "rgba(239,68,68,.1)", border: "1px solid rgba(239,68,68,.2)", borderRadius: 6, color: "#ef4444", cursor: "pointer", fontSize: 10, padding: "4px 8px", fontWeight: 700, flexShrink: 0 }}>✕</button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <button onClick={() => { if (confirm("Tem certeza? Isso vai apagar TODAS as notas, atribuições, retrabalhos e cavas.")) { fbSet("notas", null); fbSet("atribs", null); fbSet("retrab", null); fbSet("cavas", null); } }} style={{ width: "100%", marginTop: 14, padding: "12px 0", background: "rgba(239,68,68,.08)", color: "#ef4444", border: "1px solid rgba(239,68,68,.15)", borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>🗑️ Resetar Banco Completo</button>
         </div>
       )}
 
