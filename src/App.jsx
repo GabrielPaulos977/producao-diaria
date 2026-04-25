@@ -183,9 +183,36 @@ export default function App() {
       const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
       const dataRows = rows.slice(1).filter(r => r[0] && r[1]);
       const map = {};
+      
+      // Auto-detect R$ column: find which column has the header containing "R$" or "Total"
+      const header = rows[0] || [];
+      let rColIdx = -1;
+      for (let i = 0; i < header.length; i++) {
+        const h = String(header[i] || "").toLowerCase();
+        if (h.includes("r$") || h.includes("total")) { rColIdx = i; break; }
+      }
+      // Fallback: find the column with largest average numeric values (likely R$)
+      if (rColIdx < 0) {
+        const colSums = {};
+        dataRows.slice(0, 20).forEach(r => {
+          for (let i = 3; i < r.length; i++) {
+            if (typeof r[i] === "number" || (typeof r[i] === "string" && !isNaN(parseFloat(r[i])))) {
+              const v = parseFloat(r[i]) || 0;
+              if (v > 1) { colSums[i] = (colSums[i] || 0) + v; }
+            }
+          }
+        });
+        // The column with highest sum is likely R$ Total
+        let maxSum = 0;
+        Object.entries(colSums).forEach(([idx, sum]) => {
+          if (sum > maxSum) { maxSum = sum; rColIdx = parseInt(idx); }
+        });
+      }
+      if (rColIdx < 0) rColIdx = 5; // default fallback
+      
       dataRows.forEach(r => {
         const nota = String(r[0]).trim(), ponto = String(r[1]).trim();
-        const valor = parseFloat(r[5]) || 0;
+        const valor = parseFloat(r[rColIdx]) || 0;
         const us = valor / DIVISOR_US;
         if (!map[nota]) map[nota] = {};
         if (!map[nota][ponto]) map[nota][ponto] = { sc: 0, r: 0, u: 0 };
