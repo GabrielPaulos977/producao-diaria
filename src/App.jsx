@@ -186,7 +186,7 @@ export default function App() {
       dataRows.forEach(r => {
         const nota = String(r[0]).trim(), ponto = String(r[1]).trim();
         const valor = parseFloat(r[5]) || 0;
-        const us = typeof r[6] === "number" ? r[6] : valor / DIVISOR_US;
+        const us = valor / DIVISOR_US;
         if (!map[nota]) map[nota] = {};
         if (!map[nota][ponto]) map[nota][ponto] = { sc: 0, r: 0, u: 0 };
         map[nota][ponto].sc++; map[nota][ponto].r += valor; map[nota][ponto].u += us;
