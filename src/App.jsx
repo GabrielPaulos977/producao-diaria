@@ -62,6 +62,7 @@ export default function App() {
   const [atribsRaw] = useFBData("atribs", {});
   const [retrabRaw] = useFBData("retrab", {});
   const [cavasRaw] = useFBData("cavas", {});
+  const [prepsRaw] = useFBData("preps", {});
 
   const [dataSel, setDataSel] = useState(today);
   const [screen, setScreen] = useState("home");
@@ -73,9 +74,12 @@ export default function App() {
   const [addExtraFor, setAddExtraFor] = useState(null);
   const [extraForm, setExtraForm] = useState(null);
   const [cavaModal, setCavaModal] = useState(null);
+  const [cavaData, setCavaData] = useState(today);
   const [importMsg, setImportMsg] = useState("");
   const [notaBusca, setNotaBusca] = useState("");
   const [retNotaBusca, setRetNotaBusca] = useState("");
+  const [prepForm, setPrepForm] = useState(null);
+  const [prepNotaBusca, setPrepNotaBusca] = useState("");
 
   // Init notas if empty
   useEffect(() => {
@@ -88,6 +92,7 @@ export default function App() {
   const atribs = useMemo(() => fbToArr(atribsRaw), [atribsRaw]);
   const retrab = useMemo(() => fbToArr(retrabRaw), [retrabRaw]);
   const cavas = useMemo(() => fbToArr(cavasRaw), [cavasRaw]);
+  const preps = useMemo(() => fbToArr(prepsRaw), [prepsRaw]);
 
   const doDia = atribs.filter(a => a.data === dataSel);
   const eqMap = useMemo(() => { const m = {}; doDia.forEach(a => { if (!m[a.eqId]) m[a.eqId] = []; m[a.eqId].push(a); }); return m; }, [doDia]);
@@ -109,9 +114,15 @@ export default function App() {
   const getTotals = useCallback((ea) => {
     let pR = 0, pU = 0, rR = 0, rU = 0, nP = 0;
     ea.forEach(a => { const pts = getPts(a.notaId, a.pIds); pR += pts.reduce((s, p) => s + p.r, 0); pU += pts.reduce((s, p) => s + p.u, 0); const ar = getAtribReal(a); rR += ar.realR; rU += ar.realUS; nP += pts.length; });
-    if (ea.length > 0) { const cUS = getCavaUS(ea[0].eqId, c => ea.some(a => a.data === c.data)); rU += cUS; rR += cUS * DIVISOR_US; }
+    if (ea.length > 0) {
+      const eqId = ea[0].eqId;
+      const cUS = getCavaUS(eqId, c => ea.some(a => a.data === c.data)); rU += cUS; rR += cUS * DIVISOR_US;
+      const dayPreps = preps.filter(p => p.eqId === eqId && ea.some(a => a.data === p.data));
+      const prepUS = dayPreps.reduce((s, p) => s + (Number(p.us) || 0), 0);
+      rU += prepUS; rR += prepUS * DIVISOR_US;
+    }
     return { prevR: pR, prevUS: pU, realR: rR, realUS: rU, nPts: nP };
-  }, [getPts, getAtribReal, getCavaUS]);
+  }, [getPts, getAtribReal, getCavaUS, preps]);
 
   const totPrev = Object.values(eqMap).reduce((s, ea) => s + getTotals(ea).prevR, 0);
   const totReal = Object.values(eqMap).reduce((s, ea) => s + getTotals(ea).realR, 0);
@@ -132,6 +143,7 @@ export default function App() {
       if (pt && pt.n.toUpperCase().startsWith("P")) {
         st[pId] = next;
         fbSet(`atribs/${aKey}/status`, st);
+        setCavaData(atrib.data);
         setCavaModal({ atribKey: aKey, pontoId: pId, pontoNome: pt.n, data: atrib.data });
         return;
       }
@@ -146,7 +158,7 @@ export default function App() {
 
   const salvarCava = (prepEqId) => {
     if (!cavaModal) return;
-    fbPush("cavas", { atribId: cavaModal.atribKey, pontoId: cavaModal.pontoId, prepEqId, data: cavaModal.data });
+    fbPush("cavas", { atribId: cavaModal.atribKey, pontoId: cavaModal.pontoId, prepEqId, data: cavaData });
     setCavaModal(null);
   };
 
@@ -242,15 +254,21 @@ export default function App() {
     const mA = atribs.filter(a => a.data?.startsWith(month) && a.eqId === eqId);
     let rU = 0; mA.forEach(a => { rU += getAtribReal(a).realUS; });
     rU += getCavaUS(eqId, c => c.data?.startsWith(month));
+    // Add preps
+    const eqPreps = preps.filter(p => p.eqId === eqId && p.data?.startsWith(month));
+    rU += eqPreps.reduce((s, p) => s + (Number(p.us) || 0), 0);
     return Math.round(rU * 100) / 100;
-  }, [atribs, getAtribReal, getCavaUS]);
+  }, [atribs, getAtribReal, getCavaUS, preps]);
 
   const getEqDayUS = useCallback((eqId, dateStr) => {
     const dA = atribs.filter(a => a.data === dateStr && a.eqId === eqId);
     let rU = 0; dA.forEach(a => { rU += getAtribReal(a).realUS; });
     rU += getCavaUS(eqId, c => c.data === dateStr);
+    // Add preps
+    const eqPreps = preps.filter(p => p.eqId === eqId && p.data === dateStr);
+    rU += eqPreps.reduce((s, p) => s + (Number(p.us) || 0), 0);
     return Math.round(rU * 100) / 100;
-  }, [atribs, getAtribReal, getCavaUS]);
+  }, [atribs, getAtribReal, getCavaUS, preps]);
 
   const histData = useMemo(() => {
     const [y, m] = histMonth.split("-").map(Number); const dM = new Date(y, m, 0).getDate(); const days = [];
@@ -346,7 +364,7 @@ export default function App() {
 
   const isGestor = role === "gestor";
   const tabs = isGestor
-    ? [{ k: "home", l: "Painel" }, { k: "ranking", l: "Ranking" }, { k: "historico", l: "Histórico" }, { k: "retrabalho", l: "Retrabalho" }, { k: "import", l: "Importar" }]
+    ? [{ k: "home", l: "Painel" }, { k: "ranking", l: "Ranking" }, { k: "historico", l: "Histórico" }, { k: "retrabalho", l: "Retrab." }, { k: "preparacao_view", l: "Prepar." }, { k: "import", l: "Importar" }]
     : [{ k: "home", l: "Painel" }, { k: "retrabalho", l: "Retrabalho" }];
 
   // ═══ MAIN APP ═══
@@ -407,7 +425,12 @@ export default function App() {
             </div>
           )}
 
-          {!isGestor && <button onClick={() => { setAtribForm({ eqId: "", notaId: "", pIds: [] }); setScreen("atribuir"); }} style={{ width: "100%", padding: "12px 0", background: "linear-gradient(135deg,#f5c518,#e6a817)", color: "#0b1121", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 800, cursor: "pointer", marginBottom: 12, boxShadow: "0 4px 16px rgba(245,197,24,.2)" }}>+ Atribuir Pontos</button>}
+          {!isGestor && (
+            <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+              <button onClick={() => { setAtribForm({ eqId: "", notaId: "", pIds: [] }); setScreen("atribuir"); }} style={{ flex: 1, padding: "12px 0", background: "linear-gradient(135deg,#f5c518,#e6a817)", color: "#0b1121", border: "none", borderRadius: 10, fontSize: 12, fontWeight: 800, cursor: "pointer", boxShadow: "0 4px 16px rgba(245,197,24,.2)" }}>+ Atribuir Pontos</button>
+              <button onClick={() => { setPrepForm({ eqId: "", data: dataSel, notaId: "", qtdCavas: 1, obs: "" }); setPrepNotaBusca(""); setScreen("preparacao"); }} style={{ flex: 1, padding: "12px 0", background: "linear-gradient(135deg,#f97316,#ea580c)", color: "#fff", border: "none", borderRadius: 10, fontSize: 12, fontWeight: 800, cursor: "pointer", boxShadow: "0 4px 16px rgba(249,115,22,.2)" }}>🔧 Preparação</button>
+            </div>
+          )}
 
           <div style={{ fontSize: 10, fontWeight: 700, color: "#5a7aa0", textTransform: "uppercase", letterSpacing: .8, marginBottom: 6 }}>Equipes — {Object.keys(eqMap).length}/{EQUIPES.length}</div>
 
@@ -781,6 +804,179 @@ export default function App() {
         </div>
       )}
 
+      {/* ═══ PREPARAÇÃO ═══ */}
+      {screen === "preparacao" && prepForm && (
+        <div style={{ padding: "14px 14px 100px" }}>
+          <button onClick={() => { setPrepForm(null); setScreen("home"); }} style={bk}>← Voltar</button>
+          <h2 style={{ fontSize: 15, fontWeight: 800, color: "#f1f5f9", marginBottom: 4 }}>🔧 Lançar Preparação</h2>
+          <p style={{ fontSize: 11, color: "#5a7aa0", marginBottom: 14 }}>Registre cavas e serviços de preparação na data em que foram executados</p>
+
+          <FL label="Equipe de Preparação">
+            <select value={prepForm.eqId} onChange={e => setPrepForm(f => ({ ...f, eqId: e.target.value }))} style={inp}>
+              <option value="">Selecione</option>
+              {EQUIPES.map(eq => <option key={eq.id} value={eq.id}>{eqLabel(eq)} ({eq.tipo})</option>)}
+            </select>
+          </FL>
+
+          <FL label="Data da Preparação">
+            <input type="date" value={prepForm.data} onChange={e => setPrepForm(f => ({ ...f, data: e.target.value }))} style={inp} />
+          </FL>
+
+          <FL label="Nota / Obra (opcional)">
+            <input value={prepNotaBusca} onChange={e => { setPrepNotaBusca(e.target.value); setPrepForm(f => ({ ...f, notaId: "" })); }} placeholder="🔍 Pesquisar nota..." style={inp} />
+            {prepNotaBusca.length > 0 && !prepForm.notaId && (
+              <div style={{ maxHeight: 180, overflowY: "auto", marginTop: 4, display: "flex", flexDirection: "column", gap: 2 }}>
+                {notas.filter(n => n.nome.toLowerCase().includes(prepNotaBusca.toLowerCase())).map(n => (
+                  <button key={n.id} onClick={() => { setPrepForm(f => ({ ...f, notaId: n.id })); setPrepNotaBusca(n.nome); }} style={{ padding: "8px 10px", background: "#111d33", border: "1px solid #1e2d48", borderRadius: 8, cursor: "pointer", textAlign: "left", fontSize: 11, color: "#d4dce9" }}>{n.nome}</button>
+                ))}
+              </div>
+            )}
+            {prepForm.notaId && (
+              <div style={{ marginTop: 4, padding: "6px 10px", background: "rgba(249,115,22,.08)", borderRadius: 6, border: "1px solid rgba(249,115,22,.15)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: 11, color: "#f97316", fontWeight: 600 }}>{notas.find(n => n.id === prepForm.notaId)?.nome}</span>
+                <button onClick={() => { setPrepForm(f => ({ ...f, notaId: "" })); setPrepNotaBusca(""); }} style={{ background: "none", border: "none", color: "#5a7aa0", cursor: "pointer", fontSize: 12 }}>✕</button>
+              </div>
+            )}
+          </FL>
+
+          <FL label="Quantidade de cavas">
+            <input type="number" min="1" value={prepForm.qtdCavas} onChange={e => setPrepForm(f => ({ ...f, qtdCavas: parseInt(e.target.value) || 1 }))} style={inp} />
+            <div className="m" style={{ fontSize: 12, color: "#f97316", fontWeight: 700, marginTop: 6 }}>
+              = {fUS(prepForm.qtdCavas * 2)} US ({prepForm.qtdCavas} × 2 US)
+            </div>
+          </FL>
+
+          <FL label="Observação (opcional)">
+            <input value={prepForm.obs} onChange={e => setPrepForm(f => ({ ...f, obs: e.target.value }))} placeholder="Detalhes da preparação..." style={inp} />
+          </FL>
+
+          <button onClick={() => {
+            if (!prepForm.eqId || !prepForm.data) return;
+            fbPush("preps", {
+              eqId: prepForm.eqId,
+              data: prepForm.data,
+              notaId: prepForm.notaId || "",
+              qtdCavas: prepForm.qtdCavas,
+              us: prepForm.qtdCavas * 2,
+              obs: prepForm.obs || "",
+            });
+            setPrepForm(null);
+            setScreen("home");
+          }} disabled={!prepForm.eqId || !prepForm.data} style={{
+            width: "100%", padding: "13px 0", marginTop: 8,
+            background: (!prepForm.eqId || !prepForm.data) ? "#1e2d48" : "linear-gradient(135deg,#f97316,#ea580c)",
+            color: (!prepForm.eqId || !prepForm.data) ? "#3d4d66" : "#fff",
+            border: "none", borderRadius: 10, fontSize: 13, fontWeight: 800, cursor: "pointer",
+          }}>Lançar Preparação</button>
+
+          {/* Lista de preparações do mês */}
+          {(() => {
+            const monthPreps = preps.filter(p => p.data?.startsWith(histMonth));
+            if (monthPreps.length === 0) return null;
+            return (
+              <div style={{ marginTop: 20 }}>
+                <div style={{ fontSize: 10, color: "#5a7aa0", fontWeight: 700, textTransform: "uppercase", marginBottom: 6 }}>Preparações lançadas</div>
+                {monthPreps.sort((a, b) => (b.data || "").localeCompare(a.data || "")).map(p => {
+                  const eq = EQUIPES.find(e => e.id === p.eqId);
+                  const nt = notas.find(n => n.id === p.notaId);
+                  return (
+                    <div key={p._fbKey} style={{ background: "#111d33", borderRadius: 8, padding: "8px 10px", marginBottom: 3, border: "1px solid #1e2d48", display: "flex", alignItems: "center", gap: 6 }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: "#e2e8f0" }}>
+                          {eq?.nome} - {eq?.enc} <span style={{ color: "#5a7aa0", fontSize: 9 }}>· {(p.data || "").split("-").reverse().join("/")}</span>
+                        </div>
+                        <div style={{ fontSize: 10, color: "#f97316" }}>{p.qtdCavas} cava(s) · {fUS(p.us)} US</div>
+                        {nt && <div style={{ fontSize: 9, color: "#5a7aa0" }}>Nota: {nt.nome}</div>}
+                        {p.obs && <div style={{ fontSize: 9, color: "#5a7aa0", fontStyle: "italic" }}>{p.obs}</div>}
+                      </div>
+                      <button onClick={() => fbRemove("preps/" + p._fbKey)} style={{ background: "rgba(239,68,68,.1)", border: "1px solid rgba(239,68,68,.2)", borderRadius: 6, color: "#ef4444", cursor: "pointer", fontSize: 10, padding: "4px 8px", fontWeight: 700 }}>✕</button>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* ═══ PREPARAÇÃO VIEW (gestor) ═══ */}
+      {screen === "preparacao_view" && (
+        <div style={{ padding: "12px 14px 100px" }}>
+          <h2 style={{ fontSize: 15, fontWeight: 800, color: "#f1f5f9", marginBottom: 12 }}>🔧 Preparações</h2>
+          <input type="month" value={histMonth} onChange={e => setHistMonth(e.target.value)} style={{ width: "100%", marginBottom: 12, ...inp }} />
+
+          {(() => {
+            const pM = preps.filter(p => p.data?.startsWith(histMonth));
+            const totalCavas = pM.reduce((s, p) => s + (Number(p.qtdCavas) || 0), 0);
+            const totalUS = pM.reduce((s, p) => s + (Number(p.us) || 0), 0);
+
+            // Per equipe
+            const eqPreps = EQUIPES.map(eq => ({
+              ...eq,
+              cavas: pM.filter(p => p.eqId === eq.id).reduce((s, p) => s + (Number(p.qtdCavas) || 0), 0),
+              us: pM.filter(p => p.eqId === eq.id).reduce((s, p) => s + (Number(p.us) || 0), 0),
+            })).filter(e => e.cavas > 0).sort((a, b) => b.us - a.us);
+
+            return (
+              <>
+                <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+                  <div style={{ flex: 1, background: "#111d33", borderRadius: 10, padding: "10px 12px", border: "1px solid #1e2d48", borderLeft: "3px solid #f97316" }}>
+                    <div style={{ fontSize: 9, color: "#5a7aa0", fontWeight: 700, textTransform: "uppercase" }}>Cavas no mês</div>
+                    <div className="m" style={{ fontSize: 22, fontWeight: 800, color: "#f97316" }}>{totalCavas}</div>
+                  </div>
+                  <div style={{ flex: 1, background: "#111d33", borderRadius: 10, padding: "10px 12px", border: "1px solid #1e2d48", borderLeft: "3px solid #34d399" }}>
+                    <div style={{ fontSize: 9, color: "#5a7aa0", fontWeight: 700, textTransform: "uppercase" }}>US preparação</div>
+                    <div className="m" style={{ fontSize: 22, fontWeight: 800, color: "#34d399" }}>{fUS(totalUS)}</div>
+                  </div>
+                </div>
+
+                {eqPreps.length > 0 && (
+                  <div style={{ marginBottom: 14 }}>
+                    <div style={{ fontSize: 10, color: "#5a7aa0", fontWeight: 700, textTransform: "uppercase", marginBottom: 6 }}>Por Equipe</div>
+                    {eqPreps.map(eq => (
+                      <div key={eq.id} style={{ background: "#111d33", borderRadius: 8, padding: "8px 10px", marginBottom: 3, border: "1px solid #1e2d48", display: "flex", alignItems: "center", gap: 8 }}>
+                        <div style={{ flex: 1, fontSize: 11, fontWeight: 700, color: "#e2e8f0" }}>{eq.nome} - {eq.enc}</div>
+                        <div style={{ textAlign: "right" }}>
+                          <span className="m" style={{ fontSize: 12, fontWeight: 800, color: "#f97316" }}>{eq.cavas} cavas</span>
+                          <span className="m" style={{ fontSize: 10, color: "#5a7aa0", marginLeft: 8 }}>{fUS(eq.us)} US</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Lista de registros */}
+                <div style={{ fontSize: 10, color: "#5a7aa0", fontWeight: 700, textTransform: "uppercase", marginBottom: 6 }}>Registros ({pM.length})</div>
+                {pM.length === 0 ? (
+                  <div style={{ textAlign: "center", padding: 20, color: "#3a5070", fontSize: 12 }}>Nenhuma preparação registrada neste mês</div>
+                ) : (
+                  pM.sort((a, b) => (b.data || "").localeCompare(a.data || "")).map(p => {
+                    const eq = EQUIPES.find(e => e.id === p.eqId);
+                    const nt = notas.find(n => n.id === p.notaId);
+                    return (
+                      <div key={p._fbKey} style={{ background: "#111d33", borderRadius: 8, padding: "8px 10px", marginBottom: 3, border: "1px solid #1e2d48", display: "flex", alignItems: "center", gap: 6 }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 11, fontWeight: 600, color: "#e2e8f0" }}>
+                            {eq?.nome} - {eq?.enc} <span style={{ color: "#5a7aa0", fontSize: 9 }}>· {(p.data || "").split("-").reverse().join("/")}</span>
+                          </div>
+                          {nt && <div style={{ fontSize: 9, color: "#f97316" }}>Nota: {nt.nome}</div>}
+                          {p.obs && <div style={{ fontSize: 9, color: "#5a7aa0", fontStyle: "italic" }}>{p.obs}</div>}
+                        </div>
+                        <div style={{ textAlign: "right", flexShrink: 0 }}>
+                          <div className="m" style={{ fontSize: 12, fontWeight: 800, color: "#f97316" }}>{p.qtdCavas} cava(s)</div>
+                          <div className="m" style={{ fontSize: 10, color: "#34d399" }}>{fUS(p.us)} US</div>
+                        </div>
+                        <button onClick={() => fbRemove("preps/" + p._fbKey)} style={{ background: "rgba(239,68,68,.1)", border: "1px solid rgba(239,68,68,.2)", borderRadius: 6, color: "#ef4444", cursor: "pointer", fontSize: 10, padding: "4px 8px", fontWeight: 700 }}>✕</button>
+                      </div>
+                    );
+                  })
+                )}
+              </>
+            );
+          })()}
+        </div>
+      )}
+
       {/* ═══ ATRIBUIR (auxiliar) ═══ */}
       {screen === "atribuir" && atribForm && (
         <div style={{ padding: "14px 14px 100px" }}>
@@ -832,18 +1028,45 @@ export default function App() {
       )}
 
       {/* ═══ CAVA MODAL ═══ */}
-      {cavaModal && (
+      {cavaModal && (() => {
+        // Check if a prep was already registered for this nota
+        const cavaNotaId = (() => { const atrib = atribs.find(a => (a._fbKey || a.id) === cavaModal.atribKey); return atrib?.notaId || ""; })();
+        const existingPreps = preps.filter(p => p.notaId === cavaNotaId);
+        return (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.7)", zIndex: 10000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
-          <div style={{ background: "#111d33", borderRadius: 16, padding: 20, maxWidth: 340, width: "100%", border: "1px solid #1e2d48" }}>
+          <div style={{ background: "#111d33", borderRadius: 16, padding: 20, maxWidth: 340, width: "100%", border: "1px solid #1e2d48", maxHeight: "90vh", overflowY: "auto" }}>
             <div style={{ fontSize: 14, fontWeight: 800, color: "#f1f5f9", marginBottom: 4 }}>🔧 Abertura de Cava</div>
-            <div style={{ fontSize: 12, color: "#4b6080", marginBottom: 14 }}>Ponto <strong style={{ color: "#eab308" }}>{cavaModal.pontoNome}</strong> — houve cava (2 US)?</div>
-            <div style={{ maxHeight: 200, overflowY: "auto", display: "flex", flexDirection: "column", gap: 3, marginBottom: 12 }}>
+            <div style={{ fontSize: 12, color: "#5a7aa0", marginBottom: 12 }}>Ponto <strong style={{ color: "#eab308" }}>{cavaModal.pontoNome}</strong> — houve cava (2 US)?</div>
+            
+            {existingPreps.length > 0 && (
+              <div style={{ background: "rgba(34,197,94,.08)", border: "1px solid rgba(34,197,94,.2)", borderRadius: 8, padding: "8px 10px", marginBottom: 12 }}>
+                <div style={{ fontSize: 10, color: "#34d399", fontWeight: 700, marginBottom: 4 }}>✅ Preparação já registrada nesta nota</div>
+                {existingPreps.map(p => {
+                  const prepEq = EQUIPES.find(e => e.id === p.eqId);
+                  return (
+                    <div key={p._fbKey || p.id} style={{ fontSize: 10, color: "#5a7aa0" }}>
+                      {prepEq?.nome} - {prepEq?.enc} · {(p.data || "").split("-").reverse().join("/")} · {p.qtdCavas} cava(s)
+                    </div>
+                  );
+                })}
+                <button onClick={() => { setCavaModal(null); }} style={{ width: "100%", marginTop: 8, padding: "8px 0", background: "#1e2d48", color: "#34d399", border: "1px solid rgba(34,197,94,.2)", borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>Já preparado — não descontar novamente</button>
+              </div>
+            )}
+
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: "#5a7aa0", textTransform: "uppercase", marginBottom: 4 }}>Data da preparação</label>
+              <input type="date" value={cavaData} onChange={e => setCavaData(e.target.value)} style={{ ...inp, fontSize: 12 }} />
+            </div>
+            
+            <div style={{ fontSize: 10, fontWeight: 700, color: "#5a7aa0", textTransform: "uppercase", marginBottom: 4 }}>Equipe de preparação</div>
+            <div style={{ maxHeight: 180, overflowY: "auto", display: "flex", flexDirection: "column", gap: 3, marginBottom: 12 }}>
               {EQUIPES.map(eq => (<button key={eq.id} onClick={() => salvarCava(eq.id)} style={{ padding: "9px 12px", background: "#0b1121", border: "1px solid #1e2d48", borderRadius: 8, cursor: "pointer", textAlign: "left", fontSize: 11, fontWeight: 600, color: "#d4dce9", display: "flex", justifyContent: "space-between" }}><span>{eq.nome} - {eq.enc}</span><span style={{ color: tipoCor(eq.tipo), fontSize: 9 }}>{eq.tipo}</span></button>))}
             </div>
             <button onClick={() => setCavaModal(null)} style={{ width: "100%", padding: "10px 0", background: "#1e2d48", color: "#94a3b8", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Não houve cava</button>
           </div>
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
