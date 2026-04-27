@@ -164,7 +164,7 @@ export default function App() {
     fbSet(`atribs/${aKey}/extras`, extras);
   };
 
-  const pontosUsados = new Set(); doDia.forEach(a => (a.pIds || []).forEach(pid => pontosUsados.add(a.notaId + ":" + pid)));
+  const pontosUsados = new Set(); doDia.forEach(a => (a.pIds || []).forEach(pid => { const st = (a.status || {})[pid]; if (st !== "no") pontosUsados.add(a.notaId + ":" + pid); }));
 
   const salvarAtrib = () => {
     if (!atribForm?.eqId || !atribForm?.notaId || !atribForm.pIds?.length) return;
