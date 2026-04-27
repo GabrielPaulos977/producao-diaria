@@ -78,6 +78,11 @@ export default function App() {
   const [importMsg, setImportMsg] = useState("");
   const [notaBusca, setNotaBusca] = useState("");
   const [retNotaBusca, setRetNotaBusca] = useState("");
+  const [gestorSenha, setGestorSenha] = useState("");
+  const [gestorErro, setGestorErro] = useState(false);
+  const [showSenha, setShowSenha] = useState(false);
+
+  const GESTOR_SENHA = "admin2026";
   const [prepForm, setPrepForm] = useState(null);
   const [prepNotaBusca, setPrepNotaBusca] = useState("");
 
@@ -333,7 +338,7 @@ export default function App() {
     return (
       <div style={{ minHeight: "100vh", background: "#0b1121", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans',system-ui,sans-serif" }}>
         <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700;800;900&family=JetBrains+Mono:wght@600;700;800&display=swap');`}</style>
-        <div style={{ textAlign: "center", padding: 30 }}>
+        <div style={{ textAlign: "center", padding: 30, width: "100%", maxWidth: 320 }}>
           <div style={{ width: 60, height: 60, borderRadius: 16, background: "linear-gradient(135deg,#eab308,#d97706)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
             <svg width="28" height="28" viewBox="0 0 24 24" fill="#0b1121"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" /></svg>
           </div>
@@ -341,22 +346,49 @@ export default function App() {
           <p style={{ fontSize: 12, color: "#4b6080", marginBottom: 30 }}>Controle BT / MT</p>
 
           <button onClick={() => setRole("auxiliar")} style={{
-            width: "100%", maxWidth: 280, padding: "16px 24px", marginBottom: 12,
+            width: "100%", padding: "16px 24px", marginBottom: 12,
             background: "linear-gradient(135deg,#eab308,#d97706)", color: "#0b1121",
             border: "none", borderRadius: 14, fontSize: 16, fontWeight: 800, cursor: "pointer",
           }}>
             Auxiliar Técnico
           </button>
-          <div style={{ fontSize: 10, color: "#4b6080", marginBottom: 20 }}>Preencher produção, atribuir pontos, registrar retrabalho</div>
+          <div style={{ fontSize: 10, color: "#4b6080", marginBottom: 24 }}>Produção, pontos, retrabalho, preparação</div>
 
-          <button onClick={() => setRole("gestor")} style={{
-            width: "100%", maxWidth: 280, padding: "16px 24px",
-            background: "transparent", color: "#60a5fa",
-            border: "2px solid #1e2d48", borderRadius: 14, fontSize: 16, fontWeight: 800, cursor: "pointer",
-          }}>
-            Gestor
-          </button>
-          <div style={{ fontSize: 10, color: "#4b6080", marginTop: 6 }}>Monitorar indicadores, importar orçamentos, gráficos</div>
+          {!showSenha ? (
+            <button onClick={() => setShowSenha(true)} style={{
+              width: "100%", padding: "16px 24px",
+              background: "transparent", color: "#60a5fa",
+              border: "2px solid #1e2d48", borderRadius: 14, fontSize: 16, fontWeight: 800, cursor: "pointer",
+            }}>
+              Gestor
+            </button>
+          ) : (
+            <div style={{ background: "#111d33", borderRadius: 14, padding: 20, border: "1px solid #1e2d48" }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#60a5fa", marginBottom: 12 }}>🔒 Acesso Gestor</div>
+              <input
+                type="password"
+                value={gestorSenha}
+                onChange={e => { setGestorSenha(e.target.value); setGestorErro(false); }}
+                onKeyDown={e => {
+                  if (e.key === "Enter") {
+                    if (gestorSenha === GESTOR_SENHA) { setRole("gestor"); setGestorSenha(""); setShowSenha(false); }
+                    else setGestorErro(true);
+                  }
+                }}
+                placeholder="Digite a senha"
+                style={{ ...inp, marginBottom: 8, textAlign: "center", fontSize: 16, letterSpacing: 4 }}
+              />
+              {gestorErro && <div style={{ fontSize: 11, color: "#ef4444", marginBottom: 8, fontWeight: 600 }}>Senha incorreta</div>}
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={() => { setShowSenha(false); setGestorSenha(""); setGestorErro(false); }} style={{ flex: 1, padding: "10px 0", background: "#1e2d48", color: "#5a7aa0", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Cancelar</button>
+                <button onClick={() => {
+                  if (gestorSenha === GESTOR_SENHA) { setRole("gestor"); setGestorSenha(""); setShowSenha(false); }
+                  else setGestorErro(true);
+                }} style={{ flex: 1, padding: "10px 0", background: "linear-gradient(135deg,#3b9eff,#2563eb)", color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 800, cursor: "pointer" }}>Entrar</button>
+              </div>
+            </div>
+          )}
+          {!showSenha && <div style={{ fontSize: 10, color: "#4b6080", marginTop: 6 }}>Indicadores, gráficos, gestão completa</div>}
         </div>
       </div>
     );
@@ -365,7 +397,7 @@ export default function App() {
   const isGestor = role === "gestor";
   const tabs = isGestor
     ? [{ k: "home", l: "Painel" }, { k: "ranking", l: "Ranking" }, { k: "historico", l: "Histórico" }, { k: "retrabalho", l: "Retrab." }, { k: "preparacao_view", l: "Prepar." }, { k: "import", l: "Importar" }]
-    : [{ k: "home", l: "Painel" }, { k: "retrabalho", l: "Retrabalho" }];
+    : [{ k: "home", l: "Painel" }, { k: "ranking", l: "Ranking" }, { k: "retrabalho", l: "Retrab." }, { k: "preparacao_view", l: "Prepar." }, { k: "import", l: "Importar" }];
 
   // ═══ MAIN APP ═══
   return (
@@ -437,7 +469,25 @@ export default function App() {
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {EQUIPES.map(eq => {
               const ea = eqMap[eq.id] || [];
-              if (!ea.length) return (<div key={eq.id} style={{ background: "#0d1829", borderRadius: 10, padding: "10px 12px", border: "1px dashed #1a2d4d", opacity: .35, display: "flex", justifyContent: "space-between", alignItems: "center" }}><div><span style={{ fontSize: 11, fontWeight: 700, color: "#5a7aa0" }}>{eqLabel(eq)}</span><span style={{ fontSize: 9, color: tipoCor(eq.tipo), marginLeft: 6, fontWeight: 700 }}>{eq.tipo}</span></div><span style={{ fontSize: 10, color: "#2d3d56" }}>—</span></div>);
+              const dayPrepUS = preps.filter(p => p.eqId === eq.id && p.data === dataSel).reduce((s, p) => s + (Number(p.us) || 0), 0);
+              const dayCavaUS = getCavaUS(eq.id, c => c.data === dataSel);
+              const extraPrepUS = dayPrepUS + dayCavaUS;
+              
+              if (!ea.length && extraPrepUS === 0) return (<div key={eq.id} style={{ background: "#0d1829", borderRadius: 10, padding: "10px 12px", border: "1px dashed #1a2d4d", opacity: .35, display: "flex", justifyContent: "space-between", alignItems: "center" }}><div><span style={{ fontSize: 11, fontWeight: 700, color: "#5a7aa0" }}>{eqLabel(eq)}</span><span style={{ fontSize: 9, color: tipoCor(eq.tipo), marginLeft: 6, fontWeight: 700 }}>{eq.tipo}</span></div><span style={{ fontSize: 10, color: "#2d3d56" }}>—</span></div>);
+              
+              if (!ea.length && extraPrepUS > 0) return (
+                <div key={eq.id} style={{ background: "#0d1829", borderRadius: 12, border: "1.5px solid rgba(249,115,22,.2)", padding: "10px 12px", display: "flex", alignItems: "center", gap: 10 }}>
+                  <Ring value={extraPrepUS} max={eq.meta || extraPrepUS} size={46} stroke={4} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12, fontWeight: 800, color: "#f1f5f9" }}>{eqLabel(eq)} <span style={{ fontSize: 9, color: tipoCor(eq.tipo), fontWeight: 700, background: tipoCor(eq.tipo) + "18", padding: "1px 5px", borderRadius: 4 }}>{eq.tipo}</span></div>
+                    <div style={{ fontSize: 10, color: "#f97316" }}>🔧 Só preparação</div>
+                  </div>
+                  <div style={{ textAlign: "right", flexShrink: 0 }}>
+                    <div className="m" style={{ fontSize: 14, fontWeight: 800, color: "#f97316" }}>{fUS(extraPrepUS)} US</div>
+                    <div className="m" style={{ fontSize: 9, color: "#5a7aa0" }}>meta: {eq.meta} US</div>
+                  </div>
+                </div>
+              );
               const t = getTotals(ea); const pc = pct(t.realUS, eq.meta);
               let okC = 0, totP = 0; ea.forEach(a => { const pts = getPts(a.notaId, a.pIds); totP += pts.length; pts.forEach(p => { if ((a.status || {})[p.id] === "ok") okC++; }); });
               const extC = ea.reduce((s, a) => (a.extras || []).length + s, 0);
