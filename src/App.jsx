@@ -63,6 +63,7 @@ export default function App() {
   const [retrabRaw] = useFBData("retrab", {});
   const [cavasRaw] = useFBData("cavas", {});
   const [prepsRaw] = useFBData("preps", {});
+  const [inspecoesRaw] = useFBData("inspecoes", {});
 
   const [dataSel, setDataSel] = useState(today);
   const [screen, setScreen] = useState("home");
@@ -81,6 +82,8 @@ export default function App() {
   const [gestorSenha, setGestorSenha] = useState("");
   const [gestorErro, setGestorErro] = useState(false);
   const [showSenha, setShowSenha] = useState(false);
+  const [inspecaoForm, setInspecaoForm] = useState(null);
+  const [prepNotaBusca, setPrepNotaBusca] = useState("");
 
   const GESTOR_SENHA = "admin2026";
   const [prepForm, setPrepForm] = useState(null);
@@ -98,6 +101,7 @@ export default function App() {
   const retrab = useMemo(() => fbToArr(retrabRaw), [retrabRaw]);
   const cavas = useMemo(() => fbToArr(cavasRaw), [cavasRaw]);
   const preps = useMemo(() => fbToArr(prepsRaw), [prepsRaw]);
+  const inspecoes = useMemo(() => fbToArr(inspecoesRaw), [inspecoesRaw]);
 
   const doDia = atribs.filter(a => a.data === dataSel);
   const eqMap = useMemo(() => { const m = {}; doDia.forEach(a => { if (!m[a.eqId]) m[a.eqId] = []; m[a.eqId].push(a); }); return m; }, [doDia]);
@@ -396,7 +400,7 @@ export default function App() {
 
   const isGestor = role === "gestor";
   const tabs = isGestor
-    ? [{ k: "home", l: "Painel" }, { k: "ranking", l: "Ranking" }, { k: "historico", l: "Histórico" }, { k: "retrabalho", l: "Retrab." }, { k: "preparacao_view", l: "Prepar." }, { k: "import", l: "Importar" }]
+    ? [{ k: "home", l: "Painel" }, { k: "ranking", l: "Ranking" }, { k: "historico", l: "Histórico" }, { k: "retrabalho", l: "Retrab." }, { k: "preparacao_view", l: "Prepar." }, { k: "inspecoes", l: "Inspeções" }, { k: "import", l: "Importar" }]
     : [{ k: "home", l: "Painel" }, { k: "ranking", l: "Ranking" }, { k: "retrabalho", l: "Retrab." }, { k: "preparacao_view", l: "Prepar." }, { k: "import", l: "Importar" }];
 
   // ═══ MAIN APP ═══
@@ -816,6 +820,201 @@ export default function App() {
           </div>
         );
       })()}
+
+      {/* ═══ INSPEÇÕES (gestor) ═══ */}
+      {screen === "inspecoes" && !inspecaoForm && (() => {
+        const iM = inspecoes.filter(i => i.data?.startsWith(histMonth));
+        const totalInsp = iM.length;
+        const pontuadas = iM.filter(i => (Number(i.comportamento) < 100) || (Number(i.condicao) < 100)).length;
+        const mediaComp = totalInsp > 0 ? Math.round(iM.reduce((s, i) => s + (Number(i.comportamento) || 0), 0) / totalInsp * 10) / 10 : 0;
+        const mediaCond = totalInsp > 0 ? Math.round(iM.reduce((s, i) => s + (Number(i.condicao) || 0), 0) / totalInsp * 10) / 10 : 0;
+        
+        const eqInsp = EQUIPES.map(eq => {
+          const eqI = iM.filter(i => i.eqId === eq.id);
+          const total = eqI.length;
+          const pont = eqI.filter(i => (Number(i.comportamento) < 100) || (Number(i.condicao) < 100)).length;
+          const avgComp = total > 0 ? Math.round(eqI.reduce((s, i) => s + (Number(i.comportamento) || 0), 0) / total * 10) / 10 : 0;
+          const avgCond = total > 0 ? Math.round(eqI.reduce((s, i) => s + (Number(i.condicao) || 0), 0) / total * 10) / 10 : 0;
+          return { ...eq, total, pont, avgComp, avgCond };
+        }).sort((a, b) => b.total - a.total);
+
+        // Chart data - inspected teams
+        const chartData = eqInsp.filter(e => e.total > 0).map(e => ({
+          nome: e.enc,
+          comportamento: e.avgComp,
+          condicao: e.avgCond,
+        }));
+
+        // Donut data
+        const conformes = totalInsp - pontuadas;
+        const donutData = [
+          { name: "100% Conforme", value: conformes },
+          { name: "Pontuadas", value: pontuadas },
+        ];
+        const DONUT_COLS = ["#34d399", "#ef4444"];
+
+        return (
+          <div style={{ padding: "12px 14px 100px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <h2 style={{ fontSize: 15, fontWeight: 800, color: "#f1f5f9" }}>🛡️ Inspeções de Segurança</h2>
+              <button onClick={() => setInspecaoForm({ eqId: "", data: dataSel, comportamento: "", condicao: "", obs: "" })} style={{ padding: "7px 14px", background: "linear-gradient(135deg,#3b9eff,#2563eb)", color: "#fff", border: "none", borderRadius: 8, fontSize: 11, fontWeight: 800, cursor: "pointer" }}>+ Registrar</button>
+            </div>
+            <input type="month" value={histMonth} onChange={e => setHistMonth(e.target.value)} style={{ width: "100%", marginBottom: 12, ...inp }} />
+
+            {/* Summary cards */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 14 }}>
+              <div style={{ background: "#111d33", borderRadius: 10, padding: "10px 8px", border: "1px solid #1e2d48", textAlign: "center" }}>
+                <div style={{ fontSize: 8, color: "#5a7aa0", fontWeight: 700, textTransform: "uppercase" }}>Inspeções</div>
+                <div className="m" style={{ fontSize: 20, fontWeight: 800, color: "#3b9eff" }}>{totalInsp}</div>
+              </div>
+              <div style={{ background: "#111d33", borderRadius: 10, padding: "10px 8px", border: "1px solid #1e2d48", textAlign: "center" }}>
+                <div style={{ fontSize: 8, color: "#5a7aa0", fontWeight: 700, textTransform: "uppercase" }}>Pontuadas</div>
+                <div className="m" style={{ fontSize: 20, fontWeight: 800, color: "#ef4444" }}>{pontuadas}</div>
+              </div>
+              <div style={{ background: "#111d33", borderRadius: 10, padding: "10px 8px", border: "1px solid #1e2d48", textAlign: "center" }}>
+                <div style={{ fontSize: 8, color: "#5a7aa0", fontWeight: 700, textTransform: "uppercase" }}>Equipes insp.</div>
+                <div className="m" style={{ fontSize: 20, fontWeight: 800, color: "#34d399" }}>{eqInsp.filter(e => e.total > 0).length}/{EQUIPES.length}</div>
+              </div>
+            </div>
+
+            {/* Médias */}
+            <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+              <div style={{ flex: 1, background: "#111d33", borderRadius: 10, padding: "10px 12px", border: "1px solid #1e2d48" }}>
+                <div style={{ fontSize: 9, color: "#5a7aa0", fontWeight: 700, textTransform: "uppercase" }}>Média Comportamento</div>
+                <div className="m" style={{ fontSize: 22, fontWeight: 800, color: mediaComp >= 100 ? "#34d399" : mediaComp >= 90 ? "#facc15" : "#ef4444" }}>{mediaComp}%</div>
+              </div>
+              <div style={{ flex: 1, background: "#111d33", borderRadius: 10, padding: "10px 12px", border: "1px solid #1e2d48" }}>
+                <div style={{ fontSize: 9, color: "#5a7aa0", fontWeight: 700, textTransform: "uppercase" }}>Média Condição</div>
+                <div className="m" style={{ fontSize: 22, fontWeight: 800, color: mediaCond >= 100 ? "#34d399" : mediaCond >= 90 ? "#facc15" : "#ef4444" }}>{mediaCond}%</div>
+              </div>
+            </div>
+
+            {/* Donut conformidade */}
+            {totalInsp > 0 && (
+              <div style={{ background: "#111d33", borderRadius: 14, padding: "12px 8px", border: "1px solid #1e2d48", marginBottom: 14 }}>
+                <div style={{ fontSize: 9, color: "#5a7aa0", fontWeight: 700, textTransform: "uppercase", paddingLeft: 8, marginBottom: 6 }}>Conformidade Geral</div>
+                <ResponsiveContainer width="100%" height={180}>
+                  <PieChart>
+                    <Pie data={donutData} cx="50%" cy="50%" innerRadius={45} outerRadius={70} dataKey="value" stroke="none">
+                      {donutData.map((_, i) => <Cell key={i} fill={DONUT_COLS[i]} />)}
+                    </Pie>
+                    <Tooltip content={({ active, payload }) => active && payload?.length ? <div style={{ background: "#1a2540", border: "1px solid #2d3d56", borderRadius: 8, padding: "6px 10px" }}><div style={{ fontSize: 11, color: "#f1f5f9" }}>{payload[0]?.name}</div><div style={{ fontSize: 12, fontWeight: 700, color: payload[0]?.name === "Pontuadas" ? "#ef4444" : "#34d399" }}>{payload[0]?.value} ({totalInsp > 0 ? Math.round(payload[0]?.value / totalInsp * 100) : 0}%)</div></div> : null} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div style={{ display: "flex", justifyContent: "center", gap: 16 }}>
+                  <span style={{ fontSize: 10, color: "#94a3b8", display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: "#34d399" }}></span>Conforme ({conformes})</span>
+                  <span style={{ fontSize: 10, color: "#94a3b8", display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: "#ef4444" }}></span>Pontuadas ({pontuadas})</span>
+                </div>
+              </div>
+            )}
+
+            {/* Gráfico por equipe - comportamento vs condição */}
+            {chartData.length > 0 && (
+              <div style={{ background: "#111d33", borderRadius: 14, padding: "12px 6px 6px", border: "1px solid #1e2d48", marginBottom: 14 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", padding: "0 8px", marginBottom: 8 }}>
+                  <span style={{ fontSize: 9, color: "#5a7aa0", fontWeight: 700, textTransform: "uppercase" }}>Média por Equipe</span>
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <span style={{ fontSize: 9, color: "#94a3b8", display: "flex", alignItems: "center", gap: 3 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: "#3b9eff" }}></span>Comport.</span>
+                    <span style={{ fontSize: 9, color: "#94a3b8", display: "flex", alignItems: "center", gap: 3 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: "#a78bfa" }}></span>Condição</span>
+                  </div>
+                </div>
+                <ResponsiveContainer width="100%" height={Math.max(160, chartData.length * 28)}>
+                  <BarChart data={chartData} layout="vertical" margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#1e2d48" horizontal={false} />
+                    <XAxis type="number" domain={[0, 100]} tick={{ fill: "#5a7aa0", fontSize: 8 }} axisLine={false} tickLine={false} tickFormatter={v => v + "%"} />
+                    <YAxis type="category" dataKey="nome" tick={{ fill: "#d4dce9", fontSize: 10 }} width={65} axisLine={false} tickLine={false} />
+                    <Tooltip content={({ active, payload }) => active && payload?.length ? <div style={{ background: "#1a2540", border: "1px solid #2d3d56", borderRadius: 8, padding: "6px 10px" }}><div style={{ fontSize: 11, color: "#3b9eff" }}>Comportamento: {payload[0]?.value}%</div><div style={{ fontSize: 11, color: "#a78bfa" }}>Condição: {payload[1]?.value}%</div></div> : null} />
+                    <Bar dataKey="comportamento" fill="#3b9eff" radius={[0, 3, 3, 0]} barSize={10} />
+                    <Bar dataKey="condicao" fill="#a78bfa" radius={[0, 3, 3, 0]} barSize={10} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+
+            {/* Ranking */}
+            <div style={{ fontSize: 10, color: "#5a7aa0", fontWeight: 700, textTransform: "uppercase", marginBottom: 6 }}>Ranking — Inspeções e Pontuações</div>
+            {eqInsp.map((eq, i) => {
+              const isPont = eq.pont > 0;
+              return (
+                <div key={eq.id} style={{ background: "#111d33", borderRadius: 8, padding: "8px 10px", marginBottom: 3, border: "1px solid #1e2d48", display: "flex", alignItems: "center", gap: 8, opacity: eq.total === 0 ? .3 : 1 }}>
+                  <div style={{ width: 22, height: 22, borderRadius: 11, background: eq.total > 0 ? (isPont ? "rgba(239,68,68,.12)" : "rgba(52,211,153,.12)") : "#1e2d48", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: eq.total > 0 ? (isPont ? "#ef4444" : "#34d399") : "#4b6080" }}>{eq.total}</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "#e2e8f0" }}>{eq.nome} - {eq.enc}</div>
+                    {eq.total > 0 && (
+                      <div style={{ fontSize: 9, color: "#5a7aa0", display: "flex", gap: 8 }}>
+                        <span>Comp: <strong style={{ color: eq.avgComp >= 100 ? "#34d399" : "#ef4444" }}>{eq.avgComp}%</strong></span>
+                        <span>Cond: <strong style={{ color: eq.avgCond >= 100 ? "#34d399" : "#ef4444" }}>{eq.avgCond}%</strong></span>
+                        {isPont && <span style={{ color: "#ef4444", fontWeight: 700 }}>· {eq.pont}x pontuada</span>}
+                      </div>
+                    )}
+                  </div>
+                  {eq.total > 0 && <div style={{ fontSize: 10, fontWeight: 800, color: isPont ? "#ef4444" : "#34d399" }}>{isPont ? "⚠️" : "✅"}</div>}
+                </div>
+              );
+            })}
+
+            {/* Lista de registros */}
+            {iM.length > 0 && (
+              <div style={{ marginTop: 14 }}>
+                <div style={{ fontSize: 10, color: "#5a7aa0", fontWeight: 700, textTransform: "uppercase", marginBottom: 6 }}>Registros ({iM.length})</div>
+                {iM.sort((a, b) => (b.data || "").localeCompare(a.data || "")).map(i => {
+                  const eq = EQUIPES.find(e => e.id === i.eqId);
+                  const isPont = (Number(i.comportamento) < 100) || (Number(i.condicao) < 100);
+                  return (
+                    <div key={i._fbKey} style={{ background: "#111d33", borderRadius: 8, padding: "8px 10px", marginBottom: 3, border: isPont ? "1px solid rgba(239,68,68,.2)" : "1px solid #1e2d48", display: "flex", alignItems: "center", gap: 6 }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: "#e2e8f0" }}>
+                          {eq?.nome} - {eq?.enc} <span style={{ color: "#5a7aa0", fontSize: 9 }}>· {(i.data || "").split("-").reverse().join("/")}</span>
+                        </div>
+                        <div style={{ fontSize: 10, display: "flex", gap: 10 }}>
+                          <span style={{ color: Number(i.comportamento) >= 100 ? "#34d399" : "#ef4444" }}>Comp: {i.comportamento}%</span>
+                          <span style={{ color: Number(i.condicao) >= 100 ? "#34d399" : "#ef4444" }}>Cond: {i.condicao}%</span>
+                        </div>
+                        {i.obs && <div style={{ fontSize: 9, color: "#5a7aa0", fontStyle: "italic" }}>{i.obs}</div>}
+                      </div>
+                      <span style={{ fontSize: 14 }}>{isPont ? "⚠️" : "✅"}</span>
+                      <button onClick={() => fbRemove("inspecoes/" + i._fbKey)} style={{ background: "rgba(239,68,68,.1)", border: "1px solid rgba(239,68,68,.2)", borderRadius: 6, color: "#ef4444", cursor: "pointer", fontSize: 10, padding: "4px 8px", fontWeight: 700 }}>✕</button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* INSPEÇÃO FORM */}
+      {screen === "inspecoes" && inspecaoForm && (
+        <div style={{ padding: "14px 14px 100px" }}>
+          <button onClick={() => setInspecaoForm(null)} style={bk}>← Voltar</button>
+          <h2 style={{ fontSize: 15, fontWeight: 800, color: "#f1f5f9", marginBottom: 14 }}>Registrar Inspeção</h2>
+          <FL label="Equipe"><select value={inspecaoForm.eqId} onChange={e => setInspecaoForm(f => ({ ...f, eqId: e.target.value }))} style={inp}><option value="">Selecione</option>{EQUIPES.map(eq => <option key={eq.id} value={eq.id}>{eq.nome} - {eq.enc}</option>)}</select></FL>
+          <FL label="Data da inspeção"><input type="date" value={inspecaoForm.data} onChange={e => setInspecaoForm(f => ({ ...f, data: e.target.value }))} style={inp} /></FL>
+          <FL label="% Comportamento">
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <input type="number" min="0" max="100" value={inspecaoForm.comportamento} onChange={e => setInspecaoForm(f => ({ ...f, comportamento: e.target.value }))} placeholder="0 a 100" style={{ ...inp, flex: 1, fontSize: 18, textAlign: "center", fontWeight: 800, color: Number(inspecaoForm.comportamento) >= 100 ? "#34d399" : Number(inspecaoForm.comportamento) >= 90 ? "#facc15" : Number(inspecaoForm.comportamento) ? "#ef4444" : "#d4dce9" }} />
+              <span style={{ fontSize: 18, color: "#5a7aa0", fontWeight: 800 }}>%</span>
+            </div>
+          </FL>
+          <FL label="% Condição">
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <input type="number" min="0" max="100" value={inspecaoForm.condicao} onChange={e => setInspecaoForm(f => ({ ...f, condicao: e.target.value }))} placeholder="0 a 100" style={{ ...inp, flex: 1, fontSize: 18, textAlign: "center", fontWeight: 800, color: Number(inspecaoForm.condicao) >= 100 ? "#34d399" : Number(inspecaoForm.condicao) >= 90 ? "#facc15" : Number(inspecaoForm.condicao) ? "#ef4444" : "#d4dce9" }} />
+              <span style={{ fontSize: 18, color: "#5a7aa0", fontWeight: 800 }}>%</span>
+            </div>
+          </FL>
+          {(Number(inspecaoForm.comportamento) < 100 || Number(inspecaoForm.condicao) < 100) && (inspecaoForm.comportamento || inspecaoForm.condicao) && (
+            <div style={{ background: "rgba(239,68,68,.08)", border: "1px solid rgba(239,68,68,.2)", borderRadius: 8, padding: "8px 12px", marginBottom: 12, fontSize: 11, color: "#ef4444", fontWeight: 600 }}>
+              ⚠️ Equipe será pontuada (abaixo de 100%)
+            </div>
+          )}
+          <FL label="Observação"><input value={inspecaoForm.obs} onChange={e => setInspecaoForm(f => ({ ...f, obs: e.target.value }))} placeholder="Detalhes da inspeção..." style={inp} /></FL>
+          <button onClick={() => {
+            if (!inspecaoForm.eqId || !inspecaoForm.comportamento || !inspecaoForm.condicao) return;
+            fbPush("inspecoes", { ...inspecaoForm, comportamento: Number(inspecaoForm.comportamento), condicao: Number(inspecaoForm.condicao) });
+            setInspecaoForm(null);
+          }} disabled={!inspecaoForm.eqId || !inspecaoForm.comportamento || !inspecaoForm.condicao} style={{ width: "100%", padding: "13px 0", marginTop: 8, background: (!inspecaoForm.eqId || !inspecaoForm.comportamento || !inspecaoForm.condicao) ? "#1e2d48" : "linear-gradient(135deg,#3b9eff,#2563eb)", color: (!inspecaoForm.eqId || !inspecaoForm.comportamento || !inspecaoForm.condicao) ? "#3d4d66" : "#fff", border: "none", borderRadius: 10, fontSize: 13, fontWeight: 800, cursor: "pointer" }}>Registrar Inspeção</button>
+        </div>
+      )}
 
       {/* ═══ IMPORTAR (gestor) ═══ */}
       {screen === "import" && (
