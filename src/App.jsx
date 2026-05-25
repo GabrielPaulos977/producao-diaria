@@ -483,6 +483,34 @@ export default function App() {
 
           <div style={{ fontSize: 10, fontWeight: 700, color: "#5a7aa0", textTransform: "uppercase", letterSpacing: .8, marginBottom: 6 }}>Equipes — {Object.keys(eqMap).length}/{EQUIPES.length}</div>
 
+          {/* Alert: equipes abaixo da meta */}
+          {(() => {
+            const abaixoMeta = EQUIPES.filter(eq => {
+              if (!eq.meta) return false;
+              const ea = eqMap[eq.id] || [];
+              if (!ea.length) return false;
+              const prevUS = ea.reduce((s, a) => { const pts = getPts(a.notaId, a.pIds); return s + pts.reduce((ss, p) => ss + p.u, 0); }, 0);
+              return prevUS < eq.meta;
+            });
+            if (abaixoMeta.length === 0) return null;
+            return (
+              <div style={{ background: "rgba(239,68,68,.06)", border: "1.5px solid rgba(239,68,68,.2)", borderRadius: 12, padding: "10px 14px", marginBottom: 12 }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: "#ef4444", marginBottom: 6 }}>⚠️ {abaixoMeta.length} equipe(s) com programação abaixo da meta</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                  {abaixoMeta.map(eq => {
+                    const ea = eqMap[eq.id] || [];
+                    const prevUS = ea.reduce((s, a) => { const pts = getPts(a.notaId, a.pIds); return s + pts.reduce((ss, p) => ss + p.u, 0); }, 0);
+                    return (
+                      <span key={eq.id} style={{ fontSize: 9, padding: "3px 8px", background: "rgba(239,68,68,.1)", border: "1px solid rgba(239,68,68,.15)", borderRadius: 6, color: "#fb923c" }}>
+                        {eq.enc}: {fUS(prevUS)}/{eq.meta} US
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {EQUIPES.map(eq => {
               const ea = eqMap[eq.id] || [];
@@ -508,16 +536,19 @@ export default function App() {
               const t = getTotals(ea); const pc = pct(t.realUS, eq.meta);
               let okC = 0, totP = 0; ea.forEach(a => { const pts = getPts(a.notaId, a.pIds); totP += pts.length; pts.forEach(p => { if ((a.status || {})[p.id] === "ok") okC++; }); });
               const extC = ea.reduce((s, a) => (a.extras || []).length + s, 0);
-              // Média diária
               const eqMesUS = getEqMonthUS(eq.id, histMonth);
               const mediaDia = mesDiasComDados > 0 ? (eqMesUS / mesDiasComDados) : 0;
+              // Check if previsto is below meta
+              const prevUS = t.prevUS;
+              const abaixo = eq.meta > 0 && prevUS < eq.meta;
               return (
-                <div key={eq.id} onClick={() => { setSelEq(ea); setScreen("detalhe"); }} style={{ background: "#0d1829", borderRadius: 12, border: "1.5px solid " + pctCol(pc) + "30", padding: "10px 12px", cursor: "pointer", display: "flex", alignItems: "center", gap: 10, transition: "border-color .2s" }}>
+                <div key={eq.id} onClick={() => { setSelEq(ea); setScreen("detalhe"); }} style={{ background: "#0d1829", borderRadius: 12, border: abaixo ? "1.5px solid rgba(239,68,68,.3)" : "1.5px solid " + pctCol(pc) + "30", padding: "10px 12px", cursor: "pointer", display: "flex", alignItems: "center", gap: 10, transition: "border-color .2s" }}>
                   <Ring value={t.realUS} max={eq.meta || t.prevUS} size={46} stroke={4} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 12, fontWeight: 800, color: "#f1f5f9" }}>{eqLabel(eq)} <span style={{ fontSize: 9, color: tipoCor(eq.tipo), fontWeight: 700, background: tipoCor(eq.tipo) + "18", padding: "1px 5px", borderRadius: 4 }}>{eq.tipo}</span></div>
                     <div style={{ fontSize: 10, color: "#5a7aa0" }}>✅ {okC}/{totP}{extC > 0 ? " · +" + extC + " extra" : ""}</div>
-                    <div style={{ fontSize: 9, color: "#3a5070" }}>Média mês: {fUS(mediaDia)} US/dia</div>
+                    {abaixo && <div style={{ fontSize: 9, color: "#ef4444", fontWeight: 700 }}>⚠️ Programado: {fUS(prevUS)} US — abaixo da meta ({eq.meta} US)</div>}
+                    {!abaixo && <div style={{ fontSize: 9, color: "#3a5070" }}>Média mês: {fUS(mediaDia)} US/dia</div>}
                   </div>
                   <div style={{ textAlign: "right", flexShrink: 0 }}>
                     <div className="m" style={{ fontSize: 14, fontWeight: 800, color: "#34d399" }}>{fUS(t.realUS)} US</div>
@@ -1174,9 +1205,34 @@ export default function App() {
       {screen === "retrabalho" && retForm && (() => {
         const retNota = retForm.notaId ? notas.find(n => n.id === retForm.notaId) : null;
         const retItems = retForm.items || [];
+        
+        // Find which equipe executed a ponto in this nota
+        const findEqForPonto = (notaId, pontoNome) => {
+          if (!notaId || !pontoNome) return null;
+          const nota = notas.find(n => n.id === notaId);
+          if (!nota) return null;
+          const ponto = (nota.pontos || []).find(p => p.n === pontoNome);
+          if (!ponto) return null;
+          // Search all atribs for this ponto
+          for (const a of atribs) {
+            if (a.notaId !== notaId) continue;
+            if (!(a.pIds || []).includes(ponto.id)) continue;
+            const eq = EQUIPES.find(e => e.id === a.eqId);
+            if (eq) return eq;
+          }
+          return null;
+        };
+        
         const addRetItem = (pontoNome) => {
           if (retItems.find(i => i.pontoNome === pontoNome)) return;
-          setRetForm(f => ({ ...f, items: [...(f.items || []), { pontoNome, motivos: [], qtd: 1 }] }));
+          // Auto-detect equipe
+          const detectedEq = findEqForPonto(retForm.notaId, pontoNome);
+          setRetForm(f => {
+            const newItems = [...(f.items || []), { pontoNome, motivos: [], qtd: 1, detectedEqId: detectedEq?.id || "" }];
+            // If equipe field is empty and we detected one, auto-fill
+            const newEqId = !f.eqId && detectedEq ? detectedEq.id : f.eqId;
+            return { ...f, items: newItems, eqId: newEqId };
+          });
         };
         const removeRetItem = (pontoNome) => {
           setRetForm(f => ({ ...f, items: (f.items || []).filter(i => i.pontoNome !== pontoNome) }));
@@ -1224,13 +1280,17 @@ export default function App() {
                 <div style={{ maxHeight: 200, overflowY: "auto", display: "flex", flexDirection: "column", gap: 3 }}>
                   {(retNota.pontos || []).map(p => {
                     const selected = retItems.find(i => i.pontoNome === p.n);
+                    const detEq = findEqForPonto(retForm.notaId, p.n);
                     return (
                       <div key={p.id} onClick={() => selected ? removeRetItem(p.n) : addRetItem(p.n)}
                         style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", background: selected ? "rgba(239,68,68,.06)" : "#111d33", border: selected ? "1.5px solid rgba(239,68,68,.2)" : "1px solid #1e2d48", borderRadius: 8, cursor: "pointer" }}>
                         <span style={{ width: 16, height: 16, borderRadius: 4, flexShrink: 0, border: selected ? "2px solid #ef4444" : "1.5px solid #3d4d66", background: selected ? "#ef4444" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff" }}>
                           {selected && <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round"><polyline points="20 6 9 17 4 12" /></svg>}
                         </span>
-                        <span style={{ fontSize: 11, fontWeight: 600, color: "#d1d9e6" }}>{p.n}</span>
+                        <div style={{ flex: 1 }}>
+                          <span style={{ fontSize: 11, fontWeight: 600, color: "#d1d9e6" }}>{p.n}</span>
+                          {detEq && <span style={{ fontSize: 8, color: "#3b9eff", marginLeft: 6 }}>→ {detEq.enc}</span>}
+                        </div>
                       </div>
                     );
                   })}
@@ -1245,7 +1305,10 @@ export default function App() {
                 {retItems.map(item => (
                   <div key={item.pontoNome} style={{ background: "#111d33", borderRadius: 10, padding: 10, marginBottom: 6, border: "1px solid #1e2d48" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                      <span style={{ fontSize: 12, fontWeight: 700, color: "#ef4444" }}>{item.pontoNome}</span>
+                      <div>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: "#ef4444" }}>{item.pontoNome}</span>
+                        {(() => { const dEq = findEqForPonto(retForm.notaId, item.pontoNome); return dEq ? <span style={{ fontSize: 9, color: "#3b9eff", marginLeft: 6 }}>Executado por: {dEq.enc} ({dEq.nome})</span> : null; })()}
+                      </div>
                       <input type="number" min="1" value={item.qtd} onChange={e => updateRetItem(item.pontoNome, "qtd", parseInt(e.target.value) || 1)}
                         style={{ width: 50, padding: "4px 6px", background: "#0b1121", border: "1px solid #1e2d48", borderRadius: 6, color: "#d4dce9", fontSize: 12, textAlign: "center" }} />
                     </div>
