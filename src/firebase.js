@@ -1,15 +1,18 @@
-import { initializeApp } from "firebase/app";
-import { getDatabase } from "firebase/database";
+import { initializeApp } from 'firebase/app';
+import { getDatabase, ref, set, get, onValue, push, remove, update } from 'firebase/database';
 
+// ⚠️ SUBSTITUIR com suas credenciais do Firebase (ver GUIA.md)
 const firebaseConfig = {
-  apiKey: "AIzaSyDghk4KhqcxtMKMZUmOc3aFCctDgU7qFX4",
-  authDomain: "controle-de-frota-c2b3c.firebaseapp.com",
-  databaseURL: "https://controle-de-frota-c2b3c-default-rtdb.firebaseio.com",
-  projectId: "controle-de-frota-c2b3c",
-  storageBucket: "controle-de-frota-c2b3c.firebasestorage.app",
-  messagingSenderId: "442990220933",
-  appId: "1:442990220933:web:cf40593bf0fa9d234b3bec",
+  apiKey: "AIzaSyDvZjziLSryOmYnqe8nd3M3V_jC3MyRgfg",
+  authDomain: "producao-diaria-bf7e8.firebaseapp.com",
+  databaseURL: "https://producao-diaria-bf7e8-default-rtdb.firebaseio.com",
+  projectId: "producao-diaria-bf7e8",
+  storageBucket: "producao-diaria-bf7e8.firebasestorage.app",
+  messagingSenderId: "997726325170",
+  appId: "1:997726325170:web:1eeed03c145f18a2c1fcab"
 };
 
 const app = initializeApp(firebaseConfig);
-export const db = getDatabase(app);
+const db = getDatabase(app);
+
+export { db, ref, set, get, onValue, push, remove, update };
