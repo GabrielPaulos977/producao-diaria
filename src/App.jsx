@@ -3,6 +3,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGri
 import { db, ref, set, onValue, push, remove } from "./firebase";
 import { BASES, EQUIPES_POR_BASE, INTEGRANTES_POR_TIPO, FUNCIONARIOS, VEICULOS, INIT_NOTAS, DIAS_UTEIS, DIVISOR_US, MOTIVOS_RETRAB, SERVICOS_LISTA } from "./data";
 import * as XLSX from "xlsx";
+import Metas from "./Metas";
 
 const today = (() => { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); })();
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -531,9 +532,9 @@ export default function App() {
   const tabs = isProgramador
     ? [{ k: "prog_import", l: "Importar Retrab." }]
     : isCoordenador
-    ? [{ k: "visao_geral", l: "Visão Geral" }, { k: "relatorio", l: "Relatório" }, { k: "programacao_dia", l: "Programação" }, { k: "seguranca_coord", l: "Segurança" }]
+    ? [{ k: "visao_geral", l: "Visão Geral" }, { k: "relatorio", l: "Relatório" }, { k: "programacao_dia", l: "Programação" }, { k: "seguranca_coord", l: "Segurança" }, { k: "metas", l: "Metas" }]
     : isGestor
-    ? [{ k: "home", l: "Painel" }, { k: "gerencial", l: "Gerencial" }, { k: "programacao_ger", l: "Programação" }, { k: "ranking", l: "Ranking" }, { k: "status", l: "Status" }, { k: "seguranca", l: "Segurança" }, { k: "qualidade", l: "Qualidade" }, { k: "preparacao_view", l: "Prepar." }, { k: "import", l: "Importar" }]
+    ? [{ k: "home", l: "Painel" }, { k: "gerencial", l: "Gerencial" }, { k: "metas", l: "Metas" }, { k: "programacao_ger", l: "Programação" }, { k: "ranking", l: "Ranking" }, { k: "status", l: "Status" }, { k: "seguranca", l: "Segurança" }, { k: "qualidade", l: "Qualidade" }, { k: "preparacao_view", l: "Prepar." }, { k: "import", l: "Importar" }]
     : [{ k: "home", l: "Painel" }, { k: "ranking", l: "Ranking" }, { k: "status", l: "Status" }, { k: "preparacao_view", l: "Prepar." }, { k: "import", l: "Importar" }];
 
   // ═══ MAIN APP ═══
@@ -622,6 +623,8 @@ export default function App() {
       )}
 
       {/* ═══ PROGRAMADOR - IMPORTAR RETRABALHOS ═══ */}
+      {screen === "metas" && isGestor && <Metas role={role} baseSel={baseSel} />}
+
       {screen === "prog_import" && isProgramador && (() => {
         const fbToArrLocal = (obj) => { if (!obj) return []; if (Array.isArray(obj)) return obj; return Object.entries(obj).map(([k, v]) => ({ ...v, _fbKey: k })); };
         
